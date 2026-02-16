@@ -2,6 +2,9 @@
 
 A polished, Hand of Fate-inspired trading card battle game where recruiters play "objection" cards and the CV auto-counters them with "achievement" cards.
 
+## 🔗 Live Demo
+**[Play the Duel here](https://christosgalaios.github.io/InteractiveCV/)**
+
 ## 🎮 Concept
 This project transforms a standard Senior Gameplay Programmer CV into an interactive experience. The goal is to dismantle every recruiter objection with proven technical achievements in VR, Multiplayer, and Leadership.
 
