@@ -1,5 +1,6 @@
 // ============================================
-// RECRUITER vs CV — Game Engine (Updated)
+// RECRUITER vs CV — Game Engine
+// Features: HP system, Drag & Drop, Gold cards
 // ============================================
 
 const Game = (() => {
@@ -7,13 +8,22 @@ const Game = (() => {
     let state = 'TITLE'; // TITLE | BATTLE | VICTORY
     let recruiterHand = [];
     let christosDeck = [];
+    let goldDeck = [];
     let round = 0;
-    let christosScore = 0;
-    let recruiterScore = 0;
+    let christosHP = 0;
+    let recruiterHP = 0;
     let isAnimating = false;
     let battleObjCard = null;
     let battleCtrCard = null;
     let totalCards = 0;
+
+    // Drag state
+    let dragCard = null;
+    let dragData = null;
+    let dragClone = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let isDragging = false;
 
     // DOM references
     const $ = id => document.getElementById(id);
@@ -79,6 +89,12 @@ const Game = (() => {
 
         // Keyboard support
         document.addEventListener('keydown', handleKeydown);
+
+        // Drag & drop global listeners
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+        document.addEventListener('touchmove', handleTouchDragMove, { passive: false });
+        document.addEventListener('touchend', handleTouchDragEnd);
     }
 
     function handleKeydown(e) {
@@ -110,23 +126,49 @@ const Game = (() => {
     }
 
     // ================================
+    // HP display
+    // ================================
+    function renderHP() {
+        const christosHPEl = $('christos-hp');
+        const recruiterHPEl = $('recruiter-hp');
+
+        if (!christosHPEl || !recruiterHPEl) return;
+
+        // Christos HP (golden hearts)
+        let christosHTML = '';
+        for (let i = 0; i < HP_CONFIG.christos; i++) {
+            christosHTML += `<span class="heart ${i < christosHP ? 'heart-full' : 'heart-empty'}">♥</span>`;
+        }
+        christosHPEl.innerHTML = christosHTML;
+
+        // Recruiter HP (red hearts)
+        let recruiterHTML = '';
+        for (let i = 0; i < HP_CONFIG.recruiter; i++) {
+            recruiterHTML += `<span class="heart recruiter-heart ${i < recruiterHP ? 'heart-full' : 'heart-empty'}">♥</span>`;
+        }
+        recruiterHPEl.innerHTML = recruiterHTML;
+    }
+
+    // ================================
     // Battle setup
     // ================================
     function startBattle() {
         state = 'BATTLE';
         round = 0;
-        christosScore = 0;
-        recruiterScore = 0;
+        christosHP = HP_CONFIG.christos;
+        recruiterHP = HP_CONFIG.recruiter;
         isAnimating = false;
 
-        // Shuffle and deal
+        // Shuffle and deal — split counter cards into regular and gold
         recruiterHand = shuffleArray([...OBJECTION_CARDS]);
-        christosDeck = [...COUNTER_CARDS];
+        christosDeck = shuffleArray([...COUNTER_CARDS.filter(c => !c.isGold)]);
+        goldDeck = shuffleArray([...COUNTER_CARDS.filter(c => c.isGold)]);
         totalCards = recruiterHand.length;
 
         switchScreen('battle-screen');
         updateScoreboard();
         updateDeckCounts();
+        renderHP();
         clearBattleZone();
         dealHand();
 
@@ -146,7 +188,7 @@ const Game = (() => {
     }
 
     // ================================
-    // Hand management
+    // Hand management with Drag & Drop
     // ================================
     function dealHand() {
         const hand = $('recruiter-hand');
@@ -156,11 +198,118 @@ const Game = (() => {
             const cardEl = Cards.createObjectionCard(cardData, { animate: true });
             cardEl.style.animationDelay = `${idx * 0.08}s`;
 
-            cardEl.addEventListener('click', () => playObjection(cardData, cardEl));
+            // Click to play
+            cardEl.addEventListener('click', (e) => {
+                if (!isDragging) playObjection(cardData, cardEl);
+            });
             cardEl.addEventListener('mouseenter', () => AudioManager.hover());
+
+            // Drag start (mouse)
+            cardEl.addEventListener('mousedown', (e) => {
+                if (isAnimating) return;
+                startDrag(e, cardData, cardEl);
+            });
+
+            // Drag start (touch)
+            cardEl.addEventListener('touchstart', (e) => {
+                if (isAnimating) return;
+                const touch = e.touches[0];
+                startDrag(touch, cardData, cardEl);
+            }, { passive: false });
 
             hand.appendChild(cardEl);
         });
+    }
+
+    // ================================
+    // Drag & Drop — Hearthstone-style
+    // ================================
+    function startDrag(e, cardData, cardEl) {
+        if (isAnimating) return;
+        dragCard = cardEl;
+        dragData = cardData;
+        isDragging = false;
+
+        const rect = cardEl.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+
+        // We delay creating the clone until we've moved a bit (to distinguish from click)
+        dragCard._startX = e.clientX;
+        dragCard._startY = e.clientY;
+    }
+
+    function handleDragMove(e) {
+        if (!dragCard) return;
+
+        const dx = e.clientX - (dragCard._startX || 0);
+        const dy = e.clientY - (dragCard._startY || 0);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 8 && !isDragging) {
+            isDragging = true;
+            // Create floating clone
+            dragClone = dragCard.cloneNode(true);
+            dragClone.classList.add('drag-clone');
+            dragClone.style.width = dragCard.offsetWidth + 'px';
+            dragClone.style.height = dragCard.offsetHeight + 'px';
+            document.body.appendChild(dragClone);
+            dragCard.classList.add('drag-origin');
+
+            // Show drop zone highlight
+            $('slot-objection').classList.add('drop-target-active');
+        }
+
+        if (isDragging && dragClone) {
+            dragClone.style.left = (e.clientX - dragOffsetX) + 'px';
+            dragClone.style.top = (e.clientY - dragOffsetY) + 'px';
+
+            // Check proximity to drop zone
+            const dropZone = $('slot-objection');
+            const dropRect = dropZone.getBoundingClientRect();
+            const cloneRect = dragClone.getBoundingClientRect();
+            const isOver = !(cloneRect.right < dropRect.left || cloneRect.left > dropRect.right || cloneRect.bottom < dropRect.top || cloneRect.top > dropRect.bottom);
+
+            dropZone.classList.toggle('drop-target-hover', isOver);
+        }
+    }
+
+    function handleTouchDragMove(e) {
+        if (!dragCard) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        handleDragMove({ clientX: touch.clientX, clientY: touch.clientY });
+    }
+
+    function handleDragEnd(e) {
+        if (!dragCard) return;
+
+        if (isDragging && dragClone) {
+            // Check if dropped on the battle zone
+            const dropZone = $('slot-objection');
+            const dropRect = dropZone.getBoundingClientRect();
+            const cloneRect = dragClone.getBoundingClientRect();
+            const isOver = !(cloneRect.right < dropRect.left || cloneRect.left > dropRect.right || cloneRect.bottom < dropRect.top || cloneRect.top > dropRect.bottom);
+
+            // Cleanup
+            dragClone.remove();
+            dragClone = null;
+            dragCard.classList.remove('drag-origin');
+            dropZone.classList.remove('drop-target-active', 'drop-target-hover');
+
+            if (isOver) {
+                playObjection(dragData, dragCard);
+            }
+        }
+
+        dragCard = null;
+        dragData = null;
+        // Reset isDragging after a short delay so the click handler can check it
+        setTimeout(() => { isDragging = false; }, 50);
+    }
+
+    function handleTouchDragEnd(e) {
+        handleDragEnd(e);
     }
 
     // ================================
@@ -212,20 +361,56 @@ const Game = (() => {
     }
 
     function counterWithCard(objectionData) {
-        // Find matching counter
-        const counter = christosDeck.find(c => c.counters === objectionData.id);
+        // Find matching counter — check regular deck first, then gold deck
+        let counter = christosDeck.find(c => c.counters === objectionData.id);
+        let isGoldCounter = false;
+
         if (!counter) {
-            // No counter found — recruiter wins this round
-            recruiterScore++;
+            // Check gold deck for a matching counter
+            counter = goldDeck.find(c => c.counters === objectionData.id);
+            if (counter) {
+                isGoldCounter = true;
+            }
+        }
+
+        if (!counter) {
+            // No specific counter — play a random gold card as bonus if available
+            if (goldDeck.length > 0) {
+                counter = goldDeck[0];
+                isGoldCounter = true;
+            }
+        }
+
+        if (!counter) {
+            // No counter found — recruiter wins this round, Christos loses 1 HP
+            christosHP = Math.max(0, christosHP - 1);
             updateScoreboard();
-            narratorTypewrite("No answer found... The recruiter scores a point.");
+            renderHP();
+            narratorTypewrite("No answer found... The recruiter's objection lands!");
+
+            if (christosHP <= 0) {
+                setTimeout(() => endGame(false, true), 2000); // christos loses
+                return;
+            }
+
             setTimeout(() => finishRound(), 2000);
             return;
         }
 
-        // Remove from Christos' deck
-        const idx = christosDeck.findIndex(c => c.id === counter.id);
-        if (idx > -1) christosDeck.splice(idx, 1);
+        // Remove from appropriate deck
+        if (isGoldCounter) {
+            const idx = goldDeck.findIndex(c => c.id === counter.id);
+            if (idx > -1) goldDeck.splice(idx, 1);
+        } else {
+            const idx = christosDeck.findIndex(c => c.id === counter.id);
+            if (idx > -1) christosDeck.splice(idx, 1);
+        }
+
+        // Narrator for gold cards
+        if (isGoldCounter) {
+            const goldLine = NARRATOR_LINES.goldCard[Math.floor(Math.random() * NARRATOR_LINES.goldCard.length)];
+            narratorTypewrite(goldLine);
+        }
 
         // Place face-down card, then flip
         const slotCtr = $('slot-counter');
@@ -254,15 +439,17 @@ const Game = (() => {
         const overlay = $('clash-overlay');
         const resultText = $('clash-result-text');
 
-        // Counter always wins (CV is strong!)
+        // Counter always wins if power >= objection power
         const counterWins = counter.power >= objection.power;
 
         if (counterWins) {
-            christosScore++;
-            resultText.textContent = 'COUNTERED';
-            resultText.style.color = '#f5d98a';
+            // Recruiter loses HP based on power difference
+            const dmg = Math.max(1, counter.power - objection.power);
+            recruiterHP = Math.max(0, recruiterHP - dmg);
+            resultText.textContent = counter.isGold ? '✦ GOLD COUNTER' : 'COUNTERED';
+            resultText.style.color = counter.isGold ? '#ffd700' : '#f5d98a';
         } else {
-            recruiterScore++;
+            christosHP = Math.max(0, christosHP - 1);
             resultText.textContent = 'RESISTED';
             resultText.style.color = '#f06050';
         }
@@ -273,14 +460,17 @@ const Game = (() => {
 
         const battleZone = $('battle-zone');
         const center = Effects.getCenter(battleZone);
-        Effects.spawnBurst(center.x, center.y, 45, counterWins ? '#e0b44a' : '#d44030');
-        Effects.spawnSparks(center.x, center.y, 25, counterWins ? '#f5d98a' : '#ff8a80');
+        const burstColor = counter.isGold ? '#ffd700' : (counterWins ? '#e0b44a' : '#d44030');
+        const sparkColor = counter.isGold ? '#fff4b3' : (counterWins ? '#f5d98a' : '#ff8a80');
+        Effects.spawnBurst(center.x, center.y, 45, burstColor);
+        Effects.spawnSparks(center.x, center.y, 25, sparkColor);
 
         // Show overlay
         overlay.classList.add('active');
         setTimeout(() => overlay.classList.remove('active'), 1200);
 
         updateScoreboard();
+        renderHP();
 
         // Narrator explains
         const narratorMsg = counterWins
@@ -313,6 +503,16 @@ const Game = (() => {
                     battleObjCard.classList.add('card-victory-anim');
                 }
 
+                // Check for HP-based game end
+                if (recruiterHP <= 0) {
+                    setTimeout(() => endGame(false, false), 1200);
+                    return;
+                }
+                if (christosHP <= 0) {
+                    setTimeout(() => endGame(false, true), 1200);
+                    return;
+                }
+
                 setTimeout(() => finishRound(), 1800);
             }, 1500);
         }, 200);
@@ -321,14 +521,17 @@ const Game = (() => {
     function finishRound() {
         $('round-display').textContent = `Round ${Math.min(round + 1, totalCards)} / ${totalCards}`;
 
-        // Check for game end
+        // Check for game end — out of cards
         if (recruiterHand.length === 0) {
-            setTimeout(() => endGame(false), 800);
+            setTimeout(() => endGame(false, false), 800);
             return;
         }
 
-        // Low card narrator
-        if (recruiterHand.length <= 3 && recruiterHand.length > 0) {
+        // Low HP narrator
+        if (recruiterHP <= 3 && recruiterHP > 0) {
+            const line = NARRATOR_LINES.lowHP[Math.min(3 - recruiterHP, NARRATOR_LINES.lowHP.length - 1)];
+            narratorTypewrite(line);
+        } else if (recruiterHand.length <= 3 && recruiterHand.length > 0) {
             const line = NARRATOR_LINES.lowCards[Math.min(3 - recruiterHand.length, NARRATOR_LINES.lowCards.length - 1)];
             narratorTypewrite(line);
         }
@@ -346,14 +549,16 @@ const Game = (() => {
     function surrender() {
         isAnimating = true;
 
-        // Award remaining rounds to Christos
-        christosScore += recruiterHand.length;
+        // Recruiter HP drops to 0
+        recruiterHP = 0;
         recruiterHand = [];
+
+        renderHP();
 
         narratorTypewrite(NARRATOR_LINES.surrender[0], () => {
             setTimeout(() => {
                 narratorTypewrite(NARRATOR_LINES.surrender[2], () => {
-                    setTimeout(() => endGame(true), 1200);
+                    setTimeout(() => endGame(true, false), 1200);
                 });
             }, 1200);
         });
@@ -365,21 +570,38 @@ const Game = (() => {
     // ================================
     // End game
     // ================================
-    function endGame(wasSurrender) {
+    function endGame(wasSurrender, christosLost) {
         state = 'VICTORY';
 
-        const titleText = wasSurrender ? 'RECRUITER SURRENDERS' : 'OBJECTIONS EXHAUSTED';
-        const subtitleText = wasSurrender
-            ? 'Convinced. No further objections needed.'
-            : 'Every doubt answered. Every objection countered.';
+        let titleText, subtitleText;
+        if (christosLost) {
+            titleText = 'CV DEFEATED';
+            subtitleText = 'A rare defeat... but the CV will return stronger.';
+        } else if (wasSurrender) {
+            titleText = 'RECRUITER SURRENDERS';
+            subtitleText = 'Convinced. No further objections needed.';
+        } else if (recruiterHP <= 0) {
+            titleText = 'RECRUITER HP DEPLETED';
+            subtitleText = 'Every objection countered. Every doubt dismantled.';
+        } else {
+            titleText = 'OBJECTIONS EXHAUSTED';
+            subtitleText = 'The recruiter ran out of objections.';
+        }
 
         // Update victory screen content
         document.querySelector('.victory-title').textContent = titleText;
         document.querySelector('.victory-subtitle').textContent = subtitleText;
 
-        $('v-christos-score').textContent = christosScore;
-        $('v-recruiter-score').textContent = recruiterScore;
+        $('v-christos-score').textContent = christosHP;
+        $('v-recruiter-score').textContent = recruiterHP;
         $('v-rounds').textContent = round;
+
+        // Update victory stat labels
+        const statLabels = document.querySelectorAll('.v-stat-label');
+        if (statLabels.length >= 2) {
+            statLabels[0].textContent = 'Christos HP';
+            statLabels[1].textContent = 'Recruiter HP';
+        }
 
         AudioManager.victory();
         switchScreen('victory-screen');
@@ -387,9 +609,14 @@ const Game = (() => {
         // Big particle burst
         const cx = window.innerWidth / 2;
         const cy = window.innerHeight / 2;
-        Effects.spawnBurst(cx, cy, 60, '#e0b44a');
-        Effects.spawnBurst(cx, cy, 40, '#f5d98a');
-        Effects.spawnSparks(cx, cy, 35, '#ffbe0b');
+        if (!christosLost) {
+            Effects.spawnBurst(cx, cy, 60, '#e0b44a');
+            Effects.spawnBurst(cx, cy, 40, '#f5d98a');
+            Effects.spawnSparks(cx, cy, 35, '#ffbe0b');
+        } else {
+            Effects.spawnBurst(cx, cy, 40, '#d44030');
+            Effects.spawnSparks(cx, cy, 25, '#ff8a80');
+        }
     }
 
     // ================================
@@ -410,13 +637,13 @@ const Game = (() => {
     }
 
     function updateScoreboard() {
-        $('christos-score').textContent = christosScore;
-        $('recruiter-score').textContent = recruiterScore;
+        $('christos-score').textContent = christosHP;
+        $('recruiter-score').textContent = recruiterHP;
         $('round-display').textContent = `Round ${round} / ${totalCards}`;
     }
 
     function updateDeckCounts() {
-        $('christos-deck-count').textContent = christosDeck.length;
+        $('christos-deck-count').textContent = christosDeck.length + goldDeck.length;
         $('recruiter-deck-count').textContent = recruiterHand.length;
     }
 

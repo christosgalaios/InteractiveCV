@@ -60,9 +60,11 @@
                 </button>
                 <div class="battle-score">
                     <span class="score-label">CHRISTOS</span>
-                    <span class="score-value" id="christos-score">0</span>
+                    <span class="hp-display" id="christos-hp"></span>
+                    <span class="score-value" id="christos-score">1</span>
                     <span class="score-sep">—</span>
-                    <span class="score-value" id="recruiter-score">0</span>
+                    <span class="score-value" id="recruiter-score">10</span>
+                    <span class="hp-display" id="recruiter-hp"></span>
                     <span class="score-label">RECRUITER</span>
                 </div>
                 <div class="battle-round">
@@ -195,6 +197,8 @@
             </div>
         </div>
 
+        <!-- Card hover preview (Hearthstone-style) -->
+        <div id="card-preview" class="card-preview" aria-hidden="true"></div>
     </div>
 
     <!-- Scripts -->
