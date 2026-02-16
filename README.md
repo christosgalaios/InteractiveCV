@@ -1,6 +1,6 @@
 # Recruiter vs CV — Interactive Card Battle CV
 
-A polished, Hand of Fate-inspired trading card battle game where recruiters play "objection" cards and the CV auto-counters them with "achievement" cards.
+A polished, Hand of Fate and Hearthstone-inspired trading card battle game where recruiters play "objection" cards and the CV auto-counters them with "achievement" cards.
 
 ## 🔗 Live Demo
 **[Play the Duel here](https://christosgalaios.github.io/InteractiveCV/)**
