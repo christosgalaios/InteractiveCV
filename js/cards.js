@@ -110,7 +110,7 @@ const Cards = (() => {
 
     container.style.left = left + 'px';
     container.style.top = top + 'px';
-    container.style.width = previewW + 'px';
+    // Width is handled by CSS to maintain aspect ratio
   }
 
   function hidePreview() {
