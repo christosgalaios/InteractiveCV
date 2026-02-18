@@ -682,7 +682,7 @@ body {
 
 /* === HOVER — Card lifts up in hand; full preview spawned by JS === */
 .game-card:hover {
-  transform: translateY(-18px);
+  transform: translateY(-18px) scale(1.06);
   z-index: 20;
 }
 
@@ -1892,7 +1892,7 @@ body {
   }
 
   .game-card:hover {
-    transform: translateY(-14px);
+    transform: translateY(-14px) scale(1.04);
   }
 
   .heart {
@@ -2025,7 +2025,7 @@ body {
   }
 
   .game-card:hover {
-    transform: translateY(-10px);
+    transform: translateY(-10px) scale(1.03);
   }
 
   .heart {
