@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recruiter vs CV — Christos Galaios</title>
+    <meta name="description"
+        content="An interactive trading card battle game. Play recruiter objections against Christos Galaios' CV. Can you find a weakness?">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+
+<body>
+    <!-- Particle Canvas Overlay -->
+    <canvas id="fx-canvas"></canvas>
+
+    <!-- Vignette Overlay -->
+    <div class="vignette-overlay"></div>
+
+    <!-- Game Container -->
+    <div id="game-container">
+
+        <!-- ===== TITLE SCREEN ===== -->
+        <div id="title-screen" class="screen active">
+            <div class="title-bg-cards" aria-hidden="true"></div>
+            <div class="title-content">
+                <div class="title-ornament">✦ ✦ ✦</div>
+                <h1 class="title-main">Recruiter <span class="title-vs">vs</span> CV</h1>
+                <p class="title-subtitle">A Card Battle of Objections & Achievements</p>
+                <div class="title-divider"></div>
+                <p class="title-flavor">"Play your objections. I counter with my deck.<br>Out of objections? You email
+                    me."</p>
+                <div class="title-actions">
+                    <button class="btn btn-primary" id="btn-start-game">
+                        <span class="btn-icon">⚔️</span>Begin the Duel
+                    </button>
+                    <button class="btn btn-secondary" id="btn-view-decks">
+                        <span class="btn-icon">📜</span>View Decks
+                    </button>
+                    <a href="https://linkedin.com/in/christos-galaios" target="_blank" class="btn btn-accent"
+                        id="btn-linkedin">
+                        <span class="btn-icon">🔗</span>LinkedIn
+                    </a>
+                </div>
+                <p class="title-credit">Christos Galaios — Senior Gameplay Programmer | VR & Multiplayer</p>
+            </div>
+        </div>
+
+        <!-- ===== BATTLE SCREEN ===== -->
+        <div id="battle-screen" class="screen">
+            <!-- Top bar -->
+            <div class="battle-top-bar">
+                <button class="btn-icon-only" id="btn-back-title" title="Back to Title">
+                    ← EXIT
+                </button>
+                <div class="battle-score">
+                    <span class="score-label">CHRISTOS</span>
+                    <span class="hp-display" id="christos-hp"></span>
+                    <span class="score-value" id="christos-score">1</span>
+                    <span class="score-sep">—</span>
+                    <span class="score-value" id="recruiter-score">10</span>
+                    <span class="hp-display" id="recruiter-hp"></span>
+                    <span class="score-label">RECRUITER</span>
+                </div>
+                <div class="battle-round">
+                    <span id="round-display">Round 1 / 15</span>
+                </div>
+            </div>
+
+            <!-- Christos side (top) -->
+            <div class="battle-side christos-side">
+                <div class="side-label">CHRISTOS</div>
+                <div class="deck-area" id="christos-deck-area">
+                    <div class="deck-stack" id="christos-deck">
+                        <div class="deck-card-back"></div>
+                        <div class="deck-card-back"></div>
+                        <div class="deck-card-back"></div>
+                    </div>
+                    <span class="deck-count" id="christos-deck-count">10</span>
+                </div>
+            </div>
+
+            <!-- Battle Zone (center) -->
+            <div class="battle-zone" id="battle-zone">
+                <div class="battle-slot" id="slot-objection">
+                    <div class="slot-outline"></div>
+                </div>
+                <div class="battle-vs">VS</div>
+                <div class="battle-slot" id="slot-counter">
+                    <div class="slot-outline"></div>
+                </div>
+            </div>
+
+            <!-- Narrator bar -->
+            <div class="narrator-bar" id="narrator-bar">
+                <span class="narrator-icon">📖</span>
+                <span class="narrator-text" id="narrator-text"></span>
+            </div>
+
+            <!-- Recruiter side (bottom) -->
+            <div class="battle-side recruiter-side">
+                <div class="side-label">YOU <span class="side-label-sub">(RECRUITER)</span></div>
+                <div class="hand-area" id="recruiter-hand">
+                    <!-- Cards injected by JS -->
+                </div>
+                <div class="surrender-area">
+                    <button class="btn btn-danger" id="btn-surrender">
+                        <span class="btn-icon">🏳️</span>Surrender
+                    </button>
+                </div>
+                <div class="deck-area" id="recruiter-deck-area">
+                    <div class="deck-stack" id="recruiter-deck">
+                        <div class="deck-card-back recruiter-back"></div>
+                        <div class="deck-card-back recruiter-back"></div>
+                        <div class="deck-card-back recruiter-back"></div>
+                    </div>
+                    <span class="deck-count" id="recruiter-deck-count">15</span>
+                </div>
+            </div>
+
+            <!-- Clash overlay -->
+            <div class="clash-overlay" id="clash-overlay">
+                <div class="clash-burst"></div>
+                <div class="clash-text" id="clash-result-text">COUNTERED</div>
+            </div>
+        </div>
+
+        <!-- ===== VICTORY SCREEN ===== -->
+        <div id="victory-screen" class="screen">
+            <div class="victory-content">
+                <div class="victory-ornament">✦ ✦ ✦</div>
+                <h2 class="victory-title">OBJECTIONS EXHAUSTED</h2>
+                <p class="victory-subtitle">Every doubt answered. Every objection countered.</p>
+                <div class="victory-stats" id="victory-stats">
+                    <div class="v-stat">
+                        <span class="v-stat-value" id="v-christos-score">10</span>
+                        <span class="v-stat-label">Christos Score</span>
+                    </div>
+                    <div class="v-stat">
+                        <span class="v-stat-value" id="v-recruiter-score">0</span>
+                        <span class="v-stat-label">Recruiter Score</span>
+                    </div>
+                    <div class="v-stat">
+                        <span class="v-stat-value" id="v-rounds">10</span>
+                        <span class="v-stat-label">Rounds Played</span>
+                    </div>
+                </div>
+                <div class="victory-divider"></div>
+                <p class="victory-cta-text">There's only one move left...</p>
+                <div class="victory-contact" id="victory-contact">
+                    <div class="contact-row">
+                        <span class="contact-icon">📧</span>
+                        <a href="mailto:christosgaleos@gmail.com" class="contact-link">christosgaleos@gmail.com</a>
+                    </div>
+                    <div class="contact-row">
+                        <span class="contact-icon">📱</span>
+                        <span class="contact-text">07469 198668</span>
+                    </div>
+                    <div class="contact-row">
+                        <span class="contact-icon">📍</span>
+                        <span class="contact-text">Bristol, UK (Remote / Hybrid)</span>
+                    </div>
+                    <div class="contact-row">
+                        <span class="contact-icon">🔗</span>
+                        <a href="https://linkedin.com/in/christos-galaios" target="_blank"
+                            class="contact-link">linkedin.com/in/christos-galaios</a>
+                    </div>
+                </div>
+                <div class="victory-actions">
+                    <button class="btn btn-primary" id="btn-play-again">
+                        <span class="btn-icon">🔄</span>Play Again
+                    </button>
+                    <a href="mailto:christosgaleos@gmail.com" class="btn btn-accent" id="btn-email">
+                        <span class="btn-icon">📧</span>Send Email
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== DECK VIEWER MODAL ===== -->
+        <div class="modal-overlay" id="deck-modal">
+            <div class="modal-content">
+                <button class="modal-close" id="btn-close-modal">✕</button>
+                <div class="modal-tabs">
+                    <button class="modal-tab active" data-tab="recruiter-tab">Recruiter's Deck</button>
+                    <button class="modal-tab" data-tab="christos-tab">Christos' Deck</button>
+                    <button class="modal-tab" data-tab="cv-tab">Full CV</button>
+                </div>
+                <div class="modal-body" id="modal-body">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Card hover preview (Hearthstone-style) -->
+        <div id="card-preview" class="card-preview" aria-hidden="true"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/data.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/effects.js"></script>
+    <script src="js/cards.js"></script>
+    <script src="js/engine.js"></script>
+</body>
+
+</html>
