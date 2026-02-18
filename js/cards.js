@@ -18,6 +18,10 @@ const Cards = (() => {
     return previewEl;
   }
 
+  function isCardPreviewActive(cardEl) {
+    return activePreviewCard === cardEl;
+  }
+
   /**
    * Build the inner HTML for a card (shared between small and preview)
    */
@@ -349,6 +353,8 @@ const Cards = (() => {
     createCounterCard,
     flipCard,
     renderDeckPreview,
-    hidePreview
+    hidePreview,
+    showPreview,
+    isCardPreviewActive
   };
 })();

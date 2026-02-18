@@ -95,6 +95,13 @@ const Game = (() => {
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchmove', handleTouchDragMove, { passive: false });
         document.addEventListener('touchend', handleTouchDragEnd);
+
+        // Global click to hide preview if clicking outside cards
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.game-card') && !e.target.closest('.card-preview')) {
+                Cards.hidePreview();
+            }
+        });
     }
 
     function handleKeydown(e) {
@@ -198,9 +205,18 @@ const Game = (() => {
             const cardEl = Cards.createObjectionCard(cardData, { animate: true });
             cardEl.style.animationDelay = `${idx * 0.08}s`;
 
-            // Click to play
+            // Click to play (desktop: instant if hovered; mobile: tap to preview, tap again to play)
             cardEl.addEventListener('click', (e) => {
-                if (!isDragging) playObjection(cardData, cardEl);
+                if (isDragging) return;
+
+                // Check if card is currently receiving focus/preview
+                if (!Cards.isCardPreviewActive(cardEl)) {
+                    Cards.showPreview(cardData, 'objection', cardEl);
+                    e.stopPropagation();
+                    return;
+                }
+
+                playObjection(cardData, cardEl);
             });
             cardEl.addEventListener('mouseenter', () => AudioManager.hover());
 
