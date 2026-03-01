@@ -40,7 +40,7 @@ const Game = (() => {
     let lastRoundDmg = { playerHpLost: 0, christosHpLost: 0 };
 
     function calcTeamHP() {
-        return calcTeamHP();
+        return Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
     }
 
     // DOM references
