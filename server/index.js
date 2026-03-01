@@ -14,11 +14,28 @@ const io = new Server(server, {
   cors: { origin: '*' }
 });
 
+// Debug: log resolved paths on startup
+const staticRoot = path.join(__dirname, '..');
+const fs = require('fs');
+console.log('__dirname:', __dirname);
+console.log('Static root:', staticRoot);
+try {
+  console.log('Static root contents:', fs.readdirSync(staticRoot).join(', '));
+} catch (e) {
+  console.log('ERROR reading static root:', e.message);
+}
+
 // Health check
 app.get('/health', (req, res) => res.send('ok'));
 
+// Log all incoming requests for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
 // Serve static files from the project root (parent directory)
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(staticRoot));
 
 const PORT = process.env.PORT || 3000;
 
