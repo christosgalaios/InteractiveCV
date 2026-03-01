@@ -1,11 +1,13 @@
 // ============================================
 // RECRUITER vs CV — Game Engine
-// Features: HP system, Drag & Drop, Gold cards
+// Features: HP system, Drag & Drop, Gold cards,
+//           Multiplayer via Socket.io
 // ============================================
 
 const Game = (() => {
     // State
-    let state = 'TITLE'; // TITLE | BATTLE | VICTORY
+    let state = 'TITLE'; // TITLE | LOBBY | BATTLE | VICTORY
+    let mode = 'solo';   // 'solo' | 'multi'
     let recruiterHand = [];
     let christosDeck = [];
     let goldDeck = [];
@@ -25,6 +27,12 @@ const Game = (() => {
     let dragOffsetY = 0;
     let isDragging = false;
 
+    // Multiplayer state
+    let socket = null;
+    let roomCode = null;
+    let multiCardQueue = [];
+    let multiPlayers = [];
+
     // DOM references
     const $ = id => document.getElementById(id);
 
@@ -38,6 +46,12 @@ const Game = (() => {
             AudioManager.click();
             AudioManager.ambient();
             startBattle();
+        });
+
+        $('btn-host-multi').addEventListener('click', () => {
+            AudioManager.init();
+            AudioManager.click();
+            startMultiplayerLobby();
         });
 
         $('btn-view-decks').addEventListener('click', () => {
@@ -54,6 +68,11 @@ const Game = (() => {
         // Battle buttons
         $('btn-back-title').addEventListener('click', () => {
             AudioManager.click();
+            if (mode === 'multi' && socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            mode = 'solo';
             switchScreen('title-screen');
             state = 'TITLE';
         });
@@ -68,7 +87,32 @@ const Game = (() => {
         // Victory buttons
         $('btn-play-again').addEventListener('click', () => {
             AudioManager.click();
-            startBattle();
+            if (mode === 'multi') {
+                // Go back to title in multiplayer
+                if (socket) { socket.disconnect(); socket = null; }
+                mode = 'solo';
+                switchScreen('title-screen');
+                state = 'TITLE';
+            } else {
+                startBattle();
+            }
+        });
+
+        // Lobby buttons
+        $('btn-lobby-start').addEventListener('click', () => {
+            AudioManager.click();
+            if (socket && roomCode) {
+                socket.emit('start-game');
+            }
+        });
+
+        $('btn-lobby-back').addEventListener('click', () => {
+            AudioManager.click();
+            if (socket) { socket.disconnect(); socket = null; }
+            mode = 'solo';
+            roomCode = null;
+            switchScreen('title-screen');
+            state = 'TITLE';
         });
 
         // Modal
@@ -118,6 +162,18 @@ const Game = (() => {
                 closeModal();
             } else if (state === 'BATTLE') {
                 AudioManager.click();
+                if (mode === 'multi' && socket) {
+                    socket.disconnect();
+                    socket = null;
+                }
+                mode = 'solo';
+                switchScreen('title-screen');
+                state = 'TITLE';
+            } else if (state === 'LOBBY') {
+                AudioManager.click();
+                if (socket) { socket.disconnect(); socket = null; }
+                mode = 'solo';
+                roomCode = null;
                 switchScreen('title-screen');
                 state = 'TITLE';
             }
@@ -157,14 +213,30 @@ const Game = (() => {
     }
 
     // ================================
-    // Battle setup
+    // Battle setup (solo mode)
     // ================================
     function startBattle() {
+        mode = 'solo';
         state = 'BATTLE';
         round = 0;
         christosHP = HP_CONFIG.christos;
         recruiterHP = HP_CONFIG.recruiter;
         isAnimating = false;
+
+        // Show hand area, hide multiplayer bar
+        $('recruiter-hand').style.display = '';
+        $('multi-players-bar').style.display = 'none';
+
+        // Restore solo labels
+        const scoreLabels = document.querySelectorAll('.score-label');
+        if (scoreLabels.length >= 2) {
+            scoreLabels[0].textContent = 'CHRISTOS';
+            scoreLabels[1].textContent = 'RECRUITER';
+        }
+        const sideLabel = document.querySelector('.recruiter-side .side-label');
+        if (sideLabel) {
+            sideLabel.innerHTML = 'YOU <span class="side-label-sub">(RECRUITER)</span>';
+        }
 
         // Shuffle and deal — split counter cards into regular and gold
         recruiterHand = shuffleArray([...OBJECTION_CARDS]);
@@ -338,20 +410,29 @@ const Game = (() => {
 
         AudioManager.cardSlam();
 
-        // Remove card from hand
-        const idx = recruiterHand.findIndex(c => c.id === cardData.id);
-        if (idx > -1) recruiterHand.splice(idx, 1);
+        // In solo mode, remove card from hand
+        if (mode === 'solo') {
+            const idx = recruiterHand.findIndex(c => c.id === cardData.id);
+            if (idx > -1) recruiterHand.splice(idx, 1);
+        }
 
         // Animate card to battle zone
         const slotObj = $('slot-objection');
 
-        // Remove the card from hand with animation
-        cardEl.style.transition = 'opacity 0.3s, transform 0.3s';
-        cardEl.style.opacity = '0';
-        cardEl.style.transform = 'translateY(-40px) scale(0.8)';
+        if (cardEl) {
+            // Remove the card from hand with animation
+            cardEl.style.transition = 'opacity 0.3s, transform 0.3s';
+            cardEl.style.opacity = '0';
+            cardEl.style.transform = 'translateY(-40px) scale(0.8)';
+        }
+
+        // Narrator text — include player name in multiplayer
+        const narratorPrefix = (mode === 'multi' && cardData._playerName)
+            ? `${cardData._playerName} plays: "${cardData.title}"...`
+            : `The recruiter plays: "${cardData.title}"...`;
 
         setTimeout(() => {
-            cardEl.remove();
+            if (cardEl) cardEl.remove();
 
             // Place battle-sized objection card in slot
             clearBattleZone();
@@ -365,12 +446,12 @@ const Game = (() => {
             Effects.screenShake();
 
             // Narrator
-            narratorTypewrite(`The recruiter plays: "${cardData.title}"...`);
+            narratorTypewrite(narratorPrefix);
 
             // After a beat, counter
             setTimeout(() => counterWithCard(cardData), 1500);
 
-        }, 350);
+        }, cardEl ? 350 : 50);
 
         updateDeckCounts();
         updateScoreboard();
@@ -537,7 +618,22 @@ const Game = (() => {
     function finishRound() {
         $('round-display').textContent = `Round ${Math.min(round + 1, totalCards)} / ${totalCards}`;
 
-        // Check for game end — out of cards
+        if (mode === 'multi') {
+            // Tell server this card is resolved
+            if (socket) {
+                socket.emit('card-resolved', { teamHP: recruiterHP, christosHP });
+            }
+            // Clear battle zone and wait for next card from server
+            setTimeout(() => {
+                clearBattleZone();
+                isAnimating = false;
+                // Process queued cards if any arrived while animating
+                processMultiQueue();
+            }, 500);
+            return;
+        }
+
+        // Solo mode: check for game end — out of cards
         if (recruiterHand.length === 0) {
             setTimeout(() => endGame(false, false), 800);
             return;
@@ -589,6 +685,11 @@ const Game = (() => {
     function endGame(wasSurrender, christosLost) {
         state = 'VICTORY';
 
+        // In multiplayer, notify server
+        if (mode === 'multi' && socket) {
+            socket.emit('card-resolved', { teamHP: recruiterHP, christosHP });
+        }
+
         let titleText, subtitleText;
         if (christosLost) {
             titleText = 'CV DEFEATED';
@@ -597,11 +698,13 @@ const Game = (() => {
             titleText = 'RECRUITER SURRENDERS';
             subtitleText = 'Convinced. No further objections needed.';
         } else if (recruiterHP <= 0) {
-            titleText = 'RECRUITER HP DEPLETED';
+            titleText = mode === 'multi' ? 'TEAM HP DEPLETED' : 'RECRUITER HP DEPLETED';
             subtitleText = 'Every objection countered. Every doubt dismantled.';
         } else {
             titleText = 'OBJECTIONS EXHAUSTED';
-            subtitleText = 'The recruiter ran out of objections.';
+            subtitleText = mode === 'multi'
+                ? 'The interviewers ran out of objections.'
+                : 'The recruiter ran out of objections.';
         }
 
         // Update victory screen content
@@ -616,7 +719,7 @@ const Game = (() => {
         const statLabels = document.querySelectorAll('.v-stat-label');
         if (statLabels.length >= 2) {
             statLabels[0].textContent = 'Christos HP';
-            statLabels[1].textContent = 'Recruiter HP';
+            statLabels[1].textContent = mode === 'multi' ? 'Team HP' : 'Recruiter HP';
         }
 
         AudioManager.victory();
@@ -660,7 +763,7 @@ const Game = (() => {
 
     function updateDeckCounts() {
         $('christos-deck-count').textContent = christosDeck.length + goldDeck.length;
-        $('recruiter-deck-count').textContent = recruiterHand.length;
+        $('recruiter-deck-count').textContent = mode === 'multi' ? '~' : recruiterHand.length;
     }
 
     // ================================
@@ -706,6 +809,242 @@ const Game = (() => {
     function closeModal() {
         AudioManager.click();
         $('deck-modal').classList.remove('active');
+    }
+
+    // ================================
+    // MULTIPLAYER — Lobby & Socket.io
+    // ================================
+    function startMultiplayerLobby() {
+        mode = 'multi';
+        state = 'LOBBY';
+        multiPlayers = [];
+
+        switchScreen('lobby-screen');
+        $('lobby-code').textContent = '...';
+        $('lobby-players').innerHTML = '<p class="lobby-waiting">Connecting to server...</p>';
+        $('btn-lobby-start').disabled = true;
+        $('lobby-error').textContent = '';
+
+        // Connect to server
+        const serverUrl = window.location.origin;
+        socket = io(serverUrl);
+
+        socket.on('connect', () => {
+            socket.emit('create-room');
+        });
+
+        socket.on('connect_error', () => {
+            $('lobby-error').textContent = 'Cannot connect to game server. Make sure the server is running.';
+            $('lobby-players').innerHTML = '<p class="lobby-waiting">Connection failed</p>';
+        });
+
+        socket.on('room-created', ({ code }) => {
+            roomCode = code;
+            $('lobby-code').textContent = code;
+            $('lobby-players').innerHTML = '<p class="lobby-waiting">Waiting for players to scan...</p>';
+            generateQRCode(code);
+        });
+
+        socket.on('player-joined', ({ name, playerCount, players }) => {
+            multiPlayers = players;
+            renderLobbyPlayers();
+            $('btn-lobby-start').disabled = false;
+            AudioManager.init();
+            AudioManager.cardFlip();
+        });
+
+        socket.on('player-left', ({ name, playerCount, players }) => {
+            multiPlayers = players;
+            renderLobbyPlayers();
+            if (playerCount === 0) {
+                $('btn-lobby-start').disabled = true;
+            }
+        });
+
+        // Server says game is starting — send card data for dealing
+        socket.on('game-starting', () => {
+            socket.emit('deal-cards', {
+                objectionCards: [...OBJECTION_CARDS],
+                counterCards: [...COUNTER_CARDS]
+            });
+        });
+
+        // Round start (from server, after dealing)
+        socket.on('round-start', ({ roundNumber, playerCount, players }) => {
+            multiPlayers = players;
+            if (state === 'LOBBY') {
+                startMultiBattle();
+            }
+            // Update player bar status — waiting for picks
+            updateMultiPlayersBar(players, 'picking');
+        });
+
+        // A player has picked
+        socket.on('player-picked', ({ playerName, pickedCount, totalPlayers, players }) => {
+            updateMultiPlayersBar(players, 'picking');
+        });
+
+        // Server sends a card to play (one at a time)
+        socket.on('play-card', ({ playerName, cardData }) => {
+            // Add player name to card data for narrator
+            cardData._playerName = playerName;
+            if (isAnimating) {
+                multiCardQueue.push({ playerName, cardData });
+            } else {
+                playMultiCard(playerName, cardData);
+            }
+        });
+
+        // All cards resolved for this round
+        socket.on('all-resolved', () => {
+            // Low HP narrator
+            if (recruiterHP <= 3 && recruiterHP > 0) {
+                const line = NARRATOR_LINES.lowHP[Math.min(3 - recruiterHP, NARRATOR_LINES.lowHP.length - 1)];
+                narratorTypewrite(line);
+            }
+        });
+
+        // Game over from server
+        socket.on('game-over', ({ teamHP, christosHP: cHP, rounds }) => {
+            recruiterHP = teamHP;
+            christosHP = cHP;
+            round = rounds;
+            if (state !== 'VICTORY') {
+                endGame(false, cHP <= 0);
+            }
+        });
+    }
+
+    function generateQRCode(code) {
+        const canvas = $('lobby-qr-canvas');
+        const playerUrl = `${window.location.origin}/player.html?room=${code}`;
+
+        if (typeof QRCode !== 'undefined') {
+            QRCode.toCanvas(canvas, playerUrl, {
+                width: 240,
+                margin: 2,
+                color: {
+                    dark: '#f0eade',
+                    light: '#0c0f0a'
+                }
+            }, (err) => {
+                if (err) console.error('QR generation error:', err);
+            });
+        } else {
+            // Fallback: show URL as text
+            canvas.style.display = 'none';
+            const fallback = document.createElement('p');
+            fallback.className = 'lobby-qr-fallback';
+            fallback.textContent = playerUrl;
+            canvas.parentElement.appendChild(fallback);
+        }
+    }
+
+    function renderLobbyPlayers() {
+        const container = $('lobby-players');
+        if (multiPlayers.length === 0) {
+            container.innerHTML = '<p class="lobby-waiting">Waiting for players to scan...</p>';
+            return;
+        }
+
+        let html = '<div class="lobby-player-list">';
+        multiPlayers.forEach((p, i) => {
+            const statusCls = p.connected ? 'connected' : 'disconnected';
+            html += `<div class="lobby-player ${statusCls}">
+                <span class="lobby-player-icon">⚔️</span>
+                <span class="lobby-player-name">${escapeHtml(p.name)}</span>
+                ${!p.connected ? '<span class="lobby-player-status">disconnected</span>' : ''}
+            </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function startMultiBattle() {
+        state = 'BATTLE';
+        round = 0;
+        christosHP = HP_CONFIG.christos;
+        recruiterHP = HP_CONFIG.recruiter;
+        isAnimating = false;
+        multiCardQueue = [];
+
+        // Set up counter decks locally for the host to animate
+        christosDeck = shuffleArray([...COUNTER_CARDS.filter(c => !c.isGold)]);
+        goldDeck = shuffleArray([...COUNTER_CARDS.filter(c => c.isGold)]);
+        totalCards = OBJECTION_CARDS.length;
+
+        // Hide hand area, show multiplayer player bar
+        $('recruiter-hand').style.display = 'none';
+        $('multi-players-bar').style.display = '';
+
+        // Update labels for multiplayer
+        const recruiterLabel = document.querySelector('.score-label:last-of-type');
+        if (recruiterLabel && recruiterLabel.textContent === 'RECRUITER') {
+            recruiterLabel.textContent = 'TEAM';
+        }
+        const sideLabel = document.querySelector('.recruiter-side .side-label');
+        if (sideLabel) {
+            sideLabel.innerHTML = 'INTERVIEWERS <span class="side-label-sub">(TEAM)</span>';
+        }
+
+        switchScreen('battle-screen');
+        updateScoreboard();
+        updateDeckCounts();
+        renderHP();
+        clearBattleZone();
+
+        AudioManager.ambient();
+        narratorTypewrite("The interviewers ready their objections...", () => {
+            setTimeout(() => {
+                narratorTypewrite("Each player picks a card on their phone...");
+            }, 1500);
+        });
+    }
+
+    function updateMultiPlayersBar(players, phase) {
+        const bar = $('multi-players-bar');
+        const list = $('multi-players-list');
+        if (!bar || !list) return;
+
+        const label = bar.querySelector('.multi-players-label');
+        if (phase === 'picking') {
+            const picked = players.filter(p => p.picked).length;
+            const total = players.filter(p => p.connected).length;
+            label.textContent = `Picks: ${picked} / ${total}`;
+        } else {
+            label.textContent = 'Resolving...';
+        }
+
+        list.innerHTML = '';
+        players.forEach(p => {
+            const el = document.createElement('div');
+            el.className = 'multi-player-chip';
+            if (p.picked) el.classList.add('picked');
+            if (!p.connected) el.classList.add('disconnected');
+            el.innerHTML = `<span class="multi-player-name">${escapeHtml(p.name)}</span>
+                            <span class="multi-player-status">${p.picked ? '✓' : (p.connected ? '...' : '✕')}</span>`;
+            list.appendChild(el);
+        });
+    }
+
+    function playMultiCard(playerName, cardData) {
+        cardData._playerName = playerName;
+        // Play the objection using the existing animation pipeline
+        // Create a temporary card element for animation
+        playObjection(cardData, null);
+    }
+
+    function processMultiQueue() {
+        if (multiCardQueue.length > 0 && !isAnimating) {
+            const next = multiCardQueue.shift();
+            playMultiCard(next.playerName, next.cardData);
+        }
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     return { init };

@@ -39,6 +39,9 @@
                     <button class="btn btn-primary" id="btn-start-game">
                         <span class="btn-icon">⚔️</span>Begin the Duel
                     </button>
+                    <button class="btn btn-multiplayer" id="btn-host-multi">
+                        <span class="btn-icon">🌐</span>Host Multiplayer
+                    </button>
                     <button class="btn btn-secondary" id="btn-view-decks">
                         <span class="btn-icon">📜</span>View Decks
                     </button>
@@ -48,6 +51,33 @@
                     </a>
                 </div>
                 <p class="title-credit">Christos Galaios — Senior Gameplay Programmer | VR & Multiplayer</p>
+            </div>
+        </div>
+
+        <!-- ===== LOBBY SCREEN (Multiplayer) ===== -->
+        <div id="lobby-screen" class="screen">
+            <div class="lobby-content">
+                <div class="title-ornament">✦ MULTIPLAYER ✦</div>
+                <h2 class="lobby-title">Scan to Join</h2>
+                <div class="lobby-qr-container">
+                    <canvas id="lobby-qr-canvas"></canvas>
+                </div>
+                <div class="lobby-room-code">
+                    <span class="lobby-code-label">Room Code</span>
+                    <span class="lobby-code" id="lobby-code">----</span>
+                </div>
+                <div class="lobby-players" id="lobby-players">
+                    <p class="lobby-waiting">Waiting for players...</p>
+                </div>
+                <div class="lobby-actions">
+                    <button class="btn btn-primary" id="btn-lobby-start" disabled>
+                        <span class="btn-icon">⚔️</span>Start Game
+                    </button>
+                    <button class="btn btn-secondary" id="btn-lobby-back">
+                        <span class="btn-icon">←</span>Back
+                    </button>
+                </div>
+                <p class="lobby-error" id="lobby-error"></p>
             </div>
         </div>
 
@@ -105,6 +135,11 @@
             <!-- Recruiter side (bottom) -->
             <div class="battle-side recruiter-side">
                 <div class="side-label">YOU <span class="side-label-sub">(RECRUITER)</span></div>
+                <!-- Multiplayer: player pick status (hidden in solo) -->
+                <div class="multi-players-bar" id="multi-players-bar" style="display:none;">
+                    <div class="multi-players-label">Waiting for picks...</div>
+                    <div class="multi-players-list" id="multi-players-list"></div>
+                </div>
                 <div class="hand-area" id="recruiter-hand">
                     <!-- Cards injected by JS -->
                 </div>
@@ -202,6 +237,8 @@
     </div>
 
     <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="js/data.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/effects.js"></script>
