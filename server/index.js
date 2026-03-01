@@ -431,8 +431,6 @@ function endGame(code, teamHP, christosHP) {
 // ============================================
 // Start server
 // ============================================
-server.listen(PORT, () => {
-  console.log(`CV Game Server running on port ${PORT}`);
-  console.log(`Host view:   http://localhost:${PORT}/`);
-  console.log(`Player view: http://localhost:${PORT}/player.html`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`CV Game Server running on 0.0.0.0:${PORT}`);
 });
