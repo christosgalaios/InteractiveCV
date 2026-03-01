@@ -23,9 +23,7 @@ This project transforms a standard Senior Gameplay Programmer CV into an interac
 - **Web Audio API**: For real-time procedural sound generation.
 
 ## 🚀 How to Play
-1. Clone the repository.
-2. Open `index.html` in any modern browser.
-3. Or run a local server: `npx http-server`
-
+Open this link in any browser (recommended: Chrome):
+[https://christosgalaios.github.io/InteractiveCV/]
 ---
-*Created by Christos Galaios — Senior Gameplay Programmer specializing in VR & Multiplayer.*
+*Created by Christos Galaios — Senior Gameplay Programmer specialising in VR & Multiplayer.*
