@@ -919,27 +919,27 @@ const Game = (() => {
     }
 
     function generateQRCode(code) {
-        const canvas = $('lobby-qr-canvas');
+        const container = $('lobby-qr-canvas');
         const playerUrl = `${SERVER_URL}/player.html?room=${code}`;
 
+        // Clear any previous QR code
+        container.innerHTML = '';
+
         if (typeof QRCode !== 'undefined') {
-            QRCode.toCanvas(canvas, playerUrl, {
+            new QRCode(container, {
+                text: playerUrl,
                 width: 240,
-                margin: 2,
-                color: {
-                    dark: '#f0eade',
-                    light: '#0c0f0a'
-                }
-            }, (err) => {
-                if (err) console.error('QR generation error:', err);
+                height: 240,
+                colorDark: '#f0eade',
+                colorLight: '#0c0f0a',
+                correctLevel: QRCode.CorrectLevel.M
             });
         } else {
             // Fallback: show URL as text
-            canvas.style.display = 'none';
             const fallback = document.createElement('p');
             fallback.className = 'lobby-qr-fallback';
             fallback.textContent = playerUrl;
-            canvas.parentElement.appendChild(fallback);
+            container.appendChild(fallback);
         }
     }
 
