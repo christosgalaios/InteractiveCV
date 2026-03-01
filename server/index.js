@@ -14,6 +14,9 @@ const io = new Server(server, {
   cors: { origin: '*' }
 });
 
+// Health check
+app.get('/health', (req, res) => res.send('ok'));
+
 // Serve static files from the project root (parent directory)
 app.use(express.static(path.join(__dirname, '..')));
 
