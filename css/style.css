@@ -2605,7 +2605,10 @@ body {
 
 /* Override .card-preview fixed positioning when used as winner card */
 #winner-preview-card.card-preview {
-  position: relative;
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  margin: 0 !important;
   width: 280px;
   opacity: 1;
   transform: scale(0.85) translateY(20px);
