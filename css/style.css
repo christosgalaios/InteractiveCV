@@ -1964,6 +1964,19 @@ body {
     display: none;
   }
 
+  /* Battle card: shrink art so title/desc actually fit in 195px */
+  .battle-card .card-art {
+    height: 36px;
+    font-size: 20px;
+    margin: 2px 10px;
+  }
+
+  /* Tighten title so it fits in 195px-tall card */
+  .battle-card .card-title {
+    font-size: 12px;
+    padding: 6px 10px 2px;
+  }
+
   .battle-card .card-desc {
     display: block;
     font-size: 11px;
@@ -1999,10 +2012,6 @@ body {
 
   .card-source {
     font-size: 6px;
-  }
-
-  .battle-card .card-title {
-    font-size: 12px;
   }
 
   .modal-content {
@@ -2045,9 +2054,29 @@ body {
     font-size: 11px;
   }
 
-  /* On phones, hearts wrap and break the top bar layout — hide them.
-     The score-value numbers already convey the HP information. */
+  /* On phones, hearts wrap and break the top bar layout — hide them
+     and replace with a single ♥ glyph prefix via ::before */
   .hp-display {
+    display: none;
+  }
+
+  /* Single heart indicator next to each HP number */
+  #christos-score::before {
+    content: '♥ ';
+    font-size: 11px;
+    color: var(--gold-light);
+    vertical-align: 1px;
+  }
+
+  #recruiter-score::before {
+    content: '♥ ';
+    font-size: 11px;
+    color: var(--crimson-light);
+    vertical-align: 1px;
+  }
+
+  /* Round count not needed on phones — saves top-bar space */
+  .battle-round {
     display: none;
   }
 
