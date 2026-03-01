@@ -161,6 +161,7 @@
             let selectedCardId = null;
             let timerInterval = null;
             let myHP = 10;
+            let myMaxHP = 10;   // starting HP received from server
             let myPlayerId = null;
 
             // Parse room code from URL
@@ -231,7 +232,8 @@
                 socket.on('game-started', ({ hand, totalPlayers, myHP: hp, myPlayerId: pid }) => {
                     myHand = hand;
                     if (pid) myPlayerId = pid;
-                    myHP = hp || 10;
+                    myMaxHP = hp || 10;
+                    myHP = myMaxHP;
                     updateMyHP(myHP);
                     // Wait for pick-phase to show cards
                 });
@@ -322,7 +324,9 @@
                 });
 
                 socket.on('disconnect', () => {
-                    if (!$('gameover-screen').classList.contains('active')) {
+                    const onFinalScreen = $('gameover-screen').classList.contains('active')
+                        || $('knockedout-screen').classList.contains('active');
+                    if (!onFinalScreen) {
                         stopTimer();
                         $('disconnect-reason').textContent = 'Connection lost. Try rejoining.';
                         showScreen('disconnected-screen');
@@ -408,7 +412,7 @@
             // HP display (own HP only)
             // ================================
             function updateMyHP(hp) {
-                const pct = Math.max(0, (hp / 10) * 100);
+                const pct = Math.max(0, (hp / myMaxHP) * 100);
                 ['hp-fill', 'hp-fill-resolve', 'hp-fill-nocards'].forEach(id => {
                     const el = $(id);
                     if (el) el.style.width = pct + '%';

@@ -39,6 +39,10 @@ const Game = (() => {
     let currentCardPlayerId = null;  // which player's card is currently resolving
     let lastRoundDmg = { playerHpLost: 0, christosHpLost: 0 };
 
+    function calcTeamHP() {
+        return calcTeamHP();
+    }
+
     // DOM references
     const $ = id => document.getElementById(id);
 
@@ -561,7 +565,7 @@ const Game = (() => {
                 if (currentCardPlayerId && playerHPs[currentCardPlayerId]) {
                     playerHPs[currentCardPlayerId].hp = Math.max(0, playerHPs[currentCardPlayerId].hp - dmg);
                 }
-                recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+                recruiterHP = calcTeamHP();
             } else {
                 recruiterHP = Math.max(0, recruiterHP - dmg);
             }
@@ -943,15 +947,14 @@ const Game = (() => {
                 Object.entries(playerHps).forEach(([id, data]) => {
                     playerHPs[id] = data;
                 });
-                recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+                recruiterHP = calcTeamHP();
             }
             christosHP = cHP;
             updateScoreboard();
             renderHP();
-            updateMultiPlayersBar(
-                Object.values(playerHPs).map(p => ({ ...p, connected: true })),
-                'resolving'
-            );
+            // Use multiPlayers for correct connected/disconnected state;
+            // updateMultiPlayersBar pulls HP from playerHPs by id internally.
+            updateMultiPlayersBar(multiPlayers, 'resolving');
         });
 
         // A player has been knocked out
@@ -961,11 +964,14 @@ const Game = (() => {
 
         // Game over from server
         socket.on('game-over', ({ christosHP: cHP, playerHps, rounds }) => {
+            // Drain queue so no stale cards animate after end screen
+            multiCardQueue = [];
+            isAnimating = false;
             if (playerHps) {
                 Object.entries(playerHps).forEach(([id, data]) => {
                     playerHPs[id] = data;
                 });
-                recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+                recruiterHP = calcTeamHP();
             }
             christosHP = cHP;
             round = rounds;
@@ -1036,7 +1042,7 @@ const Game = (() => {
                 playerHPs[p.id] = { name: p.name, hp: p.hp || HP_CONFIG.recruiter, knockedOut: p.knockedOut || false };
             }
         });
-        recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+        recruiterHP = calcTeamHP();
 
         // Set up counter decks locally for the host to animate
         christosDeck = shuffleArray([...COUNTER_CARDS.filter(c => !c.isGold)]);
