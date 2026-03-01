@@ -48,7 +48,7 @@
         <div id="pick-screen" class="p-screen">
             <div class="p-pick-header">
                 <div class="p-hp-bar">
-                    <span class="p-hp-label">Team HP</span>
+                    <span class="p-hp-label">Your HP</span>
                     <div class="p-hp-track">
                         <div class="p-hp-fill" id="hp-fill" style="width: 100%"></div>
                     </div>
@@ -74,7 +74,7 @@
                 <!-- Picks shown here -->
             </div>
             <div class="p-hp-bar p-hp-bar-resolve">
-                <span class="p-hp-label">Team HP</span>
+                <span class="p-hp-label">Your HP</span>
                 <div class="p-hp-track">
                     <div class="p-hp-fill" id="hp-fill-resolve" style="width: 100%"></div>
                 </div>
@@ -88,12 +88,20 @@
             <h2 class="p-heading">No Cards Left</h2>
             <p class="p-text">You've played all your objections. Watch the big screen for the remaining rounds!</p>
             <div class="p-hp-bar">
-                <span class="p-hp-label">Team HP</span>
+                <span class="p-hp-label">Your HP</span>
                 <div class="p-hp-track">
                     <div class="p-hp-fill" id="hp-fill-nocards" style="width: 100%"></div>
                 </div>
                 <span class="p-hp-value" id="hp-value-nocards">10</span>
             </div>
+        </div>
+
+        <!-- ===== KNOCKED OUT SCREEN ===== -->
+        <div id="knockedout-screen" class="p-screen">
+            <div class="p-ko-icon">☠</div>
+            <h2 class="p-heading" id="ko-heading">Knocked Out!</h2>
+            <p class="p-text">Your HP hit zero — you're out of the battle.</p>
+            <p class="p-text p-text-dim">The game continues until all recruiters are eliminated. Watch the big screen!</p>
         </div>
 
         <!-- ===== GAME OVER SCREEN ===== -->
@@ -103,8 +111,8 @@
             <p class="p-text" id="gameover-subtitle"></p>
             <div class="p-stats">
                 <div class="p-stat">
-                    <span class="p-stat-value" id="go-team-hp">0</span>
-                    <span class="p-stat-label">Team HP</span>
+                    <span class="p-stat-value" id="go-my-hp">0</span>
+                    <span class="p-stat-label">Your HP</span>
                 </div>
                 <div class="p-stat">
                     <span class="p-stat-value" id="go-christos-hp">0</span>
@@ -115,7 +123,15 @@
                     <span class="p-stat-label">Rounds</span>
                 </div>
             </div>
-            <p class="p-text p-thanks">Thanks for playing!</p>
+            <div class="p-contact-links">
+                <p class="p-contact-header">Connect with Christos</p>
+                <a href="mailto:christosgaleos@gmail.com" class="p-contact-btn">
+                    <span>📧</span> christosgaleos@gmail.com
+                </a>
+                <a href="https://linkedin.com/in/christos-galaios" target="_blank" class="p-contact-btn">
+                    <span>🔗</span> linkedin.com/in/christos-galaios
+                </a>
+            </div>
         </div>
 
         <!-- ===== DISCONNECTED SCREEN ===== -->
@@ -144,7 +160,8 @@
             let myHand = [];
             let selectedCardId = null;
             let timerInterval = null;
-            let teamHP = 10;
+            let myHP = 10;
+            let myPlayerId = null;
 
             // Parse room code from URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -204,16 +221,18 @@
                     $('btn-join').innerHTML = '<span class="p-btn-icon">⚔️</span>Join Game';
                 });
 
-                socket.on('joined', ({ playerIndex, name: playerName }) => {
+                socket.on('joined', ({ playerIndex, name: playerName, playerId }) => {
+                    myPlayerId = playerId;
                     $('waiting-name').textContent = `Playing as: ${playerName}`;
                     showScreen('waiting-screen');
                 });
 
-                // Game started — receive hand
-                socket.on('game-started', ({ hand, totalPlayers, teamHP: hp }) => {
+                // Game started — receive hand and own HP
+                socket.on('game-started', ({ hand, totalPlayers, myHP: hp, myPlayerId: pid }) => {
                     myHand = hand;
-                    teamHP = hp;
-                    updateHP(teamHP);
+                    if (pid) myPlayerId = pid;
+                    myHP = hp || 10;
+                    updateMyHP(myHP);
                     // Wait for pick-phase to show cards
                 });
 
@@ -230,9 +249,6 @@
 
                 // Pick confirmed
                 socket.on('pick-confirmed', ({ cardId, auto }) => {
-                    if (auto) {
-                        // Card was auto-picked by server
-                    }
                     $('btn-confirm-pick').disabled = true;
                     $('btn-confirm-pick').textContent = 'Picked!';
                     stopTimer();
@@ -251,34 +267,49 @@
                     showScreen('resolving-screen');
                 });
 
-                // HP update
-                socket.on('round-result', ({ teamHP: hp, christosHP }) => {
-                    teamHP = hp;
-                    updateHP(teamHP);
+                // Per-player HP update
+                socket.on('round-result', ({ playerHps, christosHP }) => {
+                    if (playerHps && myPlayerId && playerHps[myPlayerId]) {
+                        myHP = playerHps[myPlayerId].hp;
+                        updateMyHP(myHP);
+                    }
                 });
 
                 // No cards left
                 socket.on('no-cards-left', () => {
-                    updateHP(teamHP);
+                    updateMyHP(myHP);
                     showScreen('nocards-screen');
                 });
 
-                // Game over
-                socket.on('game-over', ({ teamHP: hp, christosHP, rounds }) => {
+                // Knocked out — this player's HP hit zero
+                socket.on('knocked-out', ({ name }) => {
                     stopTimer();
-                    $('go-team-hp').textContent = hp;
+                    myHP = 0;
+                    updateMyHP(0);
+                    $('ko-heading').textContent = `${escapeHtml(name)} — Knocked Out!`;
+                    showScreen('knockedout-screen');
+                });
+
+                // Game over
+                socket.on('game-over', ({ playerHps, christosHP, rounds }) => {
+                    stopTimer();
+
+                    // Find own final HP
+                    let myFinalHP = myHP;
+                    if (playerHps && myPlayerId && playerHps[myPlayerId]) {
+                        myFinalHP = playerHps[myPlayerId].hp;
+                    }
+
+                    $('go-my-hp').textContent = myFinalHP;
                     $('go-christos-hp').textContent = christosHP;
                     $('go-rounds').textContent = rounds;
 
                     if (christosHP <= 0) {
                         $('gameover-title').textContent = 'CV Defeated!';
-                        $('gameover-subtitle').textContent = 'The team found a weakness!';
-                    } else if (hp <= 0) {
-                        $('gameover-title').textContent = 'HP Depleted';
-                        $('gameover-subtitle').textContent = 'Every objection was countered.';
+                        $('gameover-subtitle').textContent = 'The team broke through!';
                     } else {
-                        $('gameover-title').textContent = 'All Objections Played';
-                        $('gameover-subtitle').textContent = 'No objections remain. The CV stands.';
+                        $('gameover-title').textContent = 'Objections Exhausted!';
+                        $('gameover-subtitle').textContent = 'Every challenge was answered. Impressive.';
                     }
                     showScreen('gameover-screen');
                 });
@@ -291,7 +322,6 @@
                 });
 
                 socket.on('disconnect', () => {
-                    // Only show if not already on gameover
                     if (!$('gameover-screen').classList.contains('active')) {
                         stopTimer();
                         $('disconnect-reason').textContent = 'Connection lost. Try rejoining.';
@@ -331,9 +361,7 @@
             }
 
             function selectCard(cardId, cardEl) {
-                // Deselect previous
                 document.querySelectorAll('.p-card.selected').forEach(c => c.classList.remove('selected'));
-
                 selectedCardId = cardId;
                 cardEl.classList.add('selected');
                 $('btn-confirm-pick').disabled = false;
@@ -377,9 +405,9 @@
             }
 
             // ================================
-            // HP display
+            // HP display (own HP only)
             // ================================
-            function updateHP(hp) {
+            function updateMyHP(hp) {
                 const pct = Math.max(0, (hp / 10) * 100);
                 ['hp-fill', 'hp-fill-resolve', 'hp-fill-nocards'].forEach(id => {
                     const el = $(id);
