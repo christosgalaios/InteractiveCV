@@ -6,6 +6,9 @@
 
 const Game = (() => {
     // State
+        const SERVER_URL = window.location.hostname.includes('github.io')
+                ? 'https://interactivecv-production.up.railway.app'
+                        : window.location.origin;
     let state = 'TITLE'; // TITLE | LOBBY | BATTLE | VICTORY
     let mode = 'solo';   // 'solo' | 'multi'
     let recruiterHand = [];
@@ -826,7 +829,7 @@ const Game = (() => {
         $('lobby-error').textContent = '';
 
         // Connect to server
-        const serverUrl = window.location.origin;
+        const serverUrl = SERVER_URL;
         socket = io(serverUrl);
 
         socket.on('connect', () => {
@@ -917,7 +920,7 @@ const Game = (() => {
 
     function generateQRCode(code) {
         const canvas = $('lobby-qr-canvas');
-        const playerUrl = `${window.location.origin}/player.html?room=${code}`;
+        const playerUrl = `${SERVER_URL}/player.html?room=${code}`;
 
         if (typeof QRCode !== 'undefined') {
             QRCode.toCanvas(canvas, playerUrl, {
