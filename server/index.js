@@ -1,14 +1,16 @@
+console.log('=== SERVER SCRIPT STARTING ===');
+
 // ============================================
 // Recruiter vs CV — Multiplayer Server
 // Express + Socket.io
 // ============================================
 
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
+  console.log('UNCAUGHT EXCEPTION:', err.stack || err);
   process.exit(1);
 });
 process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION:', err);
+  console.log('UNHANDLED REJECTION:', err.stack || err);
   process.exit(1);
 });
 
@@ -457,6 +459,7 @@ function endGame(code, teamHP, christosHP) {
 // ============================================
 // Start server
 // ============================================
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`CV Game Server running on 0.0.0.0:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`CV Game Server running on port ${PORT}`);
+  console.log('=== SERVER READY TO ACCEPT CONNECTIONS ===');
 });
