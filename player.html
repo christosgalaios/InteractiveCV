@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Join Game — Recruiter vs CV</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/player.css">
+</head>
+
+<body>
+    <div id="player-app">
+
+        <!-- ===== JOIN SCREEN ===== -->
+        <div id="join-screen" class="p-screen active">
+            <div class="p-title-ornament">✦ ✦ ✦</div>
+            <h1 class="p-title">Recruiter vs CV</h1>
+            <p class="p-subtitle">Join the Battle</p>
+            <div class="p-join-form">
+                <label class="p-label" for="input-name">Your Name</label>
+                <input type="text" id="input-name" class="p-input" placeholder="e.g. Sarah" maxlength="20"
+                    autocomplete="off">
+                <label class="p-label" for="input-room">Room Code</label>
+                <input type="text" id="input-room" class="p-input p-input-code" placeholder="ABCD" maxlength="4"
+                    autocomplete="off" style="text-transform: uppercase;">
+                <button class="p-btn p-btn-primary" id="btn-join">
+                    <span class="p-btn-icon">⚔️</span>Join Game
+                </button>
+                <p class="p-error" id="join-error"></p>
+            </div>
+        </div>
+
+        <!-- ===== WAITING SCREEN ===== -->
+        <div id="waiting-screen" class="p-screen">
+            <div class="p-title-ornament">✦ ✦ ✦</div>
+            <h2 class="p-heading">Waiting for Host</h2>
+            <p class="p-text">You're in! The host will start the game shortly.</p>
+            <div class="p-waiting-spinner"></div>
+            <p class="p-text p-text-dim" id="waiting-name"></p>
+        </div>
+
+        <!-- ===== PICK SCREEN ===== -->
+        <div id="pick-screen" class="p-screen">
+            <div class="p-pick-header">
+                <div class="p-hp-bar">
+                    <span class="p-hp-label">Team HP</span>
+                    <div class="p-hp-track">
+                        <div class="p-hp-fill" id="hp-fill" style="width: 100%"></div>
+                    </div>
+                    <span class="p-hp-value" id="hp-value">10</span>
+                </div>
+                <div class="p-timer" id="pick-timer">15</div>
+            </div>
+            <p class="p-pick-prompt">Choose your objection card:</p>
+            <div class="p-hand" id="player-hand">
+                <!-- Cards injected by JS -->
+            </div>
+            <button class="p-btn p-btn-confirm" id="btn-confirm-pick" disabled>
+                Confirm Pick
+            </button>
+        </div>
+
+        <!-- ===== RESOLVING SCREEN ===== -->
+        <div id="resolving-screen" class="p-screen">
+            <div class="p-title-ornament">⚔️</div>
+            <h2 class="p-heading">Battle in Progress!</h2>
+            <p class="p-text">Watch the big screen!</p>
+            <div class="p-resolve-list" id="resolve-list">
+                <!-- Picks shown here -->
+            </div>
+            <div class="p-hp-bar p-hp-bar-resolve">
+                <span class="p-hp-label">Team HP</span>
+                <div class="p-hp-track">
+                    <div class="p-hp-fill" id="hp-fill-resolve" style="width: 100%"></div>
+                </div>
+                <span class="p-hp-value" id="hp-value-resolve">10</span>
+            </div>
+        </div>
+
+        <!-- ===== NO CARDS SCREEN ===== -->
+        <div id="nocards-screen" class="p-screen">
+            <div class="p-title-ornament">📜</div>
+            <h2 class="p-heading">No Cards Left</h2>
+            <p class="p-text">You've played all your objections. Watch the big screen for the remaining rounds!</p>
+            <div class="p-hp-bar">
+                <span class="p-hp-label">Team HP</span>
+                <div class="p-hp-track">
+                    <div class="p-hp-fill" id="hp-fill-nocards" style="width: 100%"></div>
+                </div>
+                <span class="p-hp-value" id="hp-value-nocards">10</span>
+            </div>
+        </div>
+
+        <!-- ===== GAME OVER SCREEN ===== -->
+        <div id="gameover-screen" class="p-screen">
+            <div class="p-title-ornament">✦ ✦ ✦</div>
+            <h2 class="p-heading" id="gameover-title">Game Over</h2>
+            <p class="p-text" id="gameover-subtitle"></p>
+            <div class="p-stats">
+                <div class="p-stat">
+                    <span class="p-stat-value" id="go-team-hp">0</span>
+                    <span class="p-stat-label">Team HP</span>
+                </div>
+                <div class="p-stat">
+                    <span class="p-stat-value" id="go-christos-hp">0</span>
+                    <span class="p-stat-label">Christos HP</span>
+                </div>
+                <div class="p-stat">
+                    <span class="p-stat-value" id="go-rounds">0</span>
+                    <span class="p-stat-label">Rounds</span>
+                </div>
+            </div>
+            <p class="p-text p-thanks">Thanks for playing!</p>
+        </div>
+
+        <!-- ===== DISCONNECTED SCREEN ===== -->
+        <div id="disconnected-screen" class="p-screen">
+            <div class="p-title-ornament">⚠️</div>
+            <h2 class="p-heading">Disconnected</h2>
+            <p class="p-text" id="disconnect-reason">Connection lost. The host may have ended the game.</p>
+            <button class="p-btn p-btn-primary" id="btn-rejoin" onclick="location.reload()">
+                <span class="p-btn-icon">🔄</span>Rejoin
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Socket.io from CDN -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+    <script>
+        // ============================================
+        // Player Controller — Mobile Phone View
+        // ============================================
+        (() => {
+            const $ = id => document.getElementById(id);
+
+            let socket = null;
+            let myHand = [];
+            let selectedCardId = null;
+            let timerInterval = null;
+            let teamHP = 10;
+
+            // Parse room code from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            if (roomFromUrl) {
+                $('input-room').value = roomFromUrl.toUpperCase();
+            }
+
+            // ================================
+            // Screen management
+            // ================================
+            function showScreen(screenId) {
+                document.querySelectorAll('.p-screen').forEach(s => s.classList.remove('active'));
+                $(screenId).classList.add('active');
+            }
+
+            // ================================
+            // Connect & join
+            // ================================
+            $('btn-join').addEventListener('click', joinGame);
+            $('input-name').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
+            $('input-room').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
+
+            function joinGame() {
+                const name = $('input-name').value.trim();
+                const code = $('input-room').value.trim().toUpperCase();
+
+                if (!name) {
+                    showError('Please enter your name.');
+                    return;
+                }
+                if (!code || code.length !== 4) {
+                    showError('Enter a 4-character room code.');
+                    return;
+                }
+
+                $('btn-join').disabled = true;
+                $('btn-join').textContent = 'Connecting...';
+
+                // Connect to server
+                const serverUrl = window.location.origin;
+                socket = io(serverUrl);
+
+                socket.on('connect', () => {
+                    socket.emit('join-room', { code, name });
+                });
+
+                socket.on('connect_error', () => {
+                    showError('Cannot reach server. Check your connection.');
+                    $('btn-join').disabled = false;
+                    $('btn-join').innerHTML = '<span class="p-btn-icon">⚔️</span>Join Game';
+                });
+
+                socket.on('join-error', ({ message }) => {
+                    showError(message);
+                    $('btn-join').disabled = false;
+                    $('btn-join').innerHTML = '<span class="p-btn-icon">⚔️</span>Join Game';
+                });
+
+                socket.on('joined', ({ playerIndex, name: playerName }) => {
+                    $('waiting-name').textContent = `Playing as: ${playerName}`;
+                    showScreen('waiting-screen');
+                });
+
+                // Game started — receive hand
+                socket.on('game-started', ({ hand, totalPlayers, teamHP: hp }) => {
+                    myHand = hand;
+                    teamHP = hp;
+                    updateHP(teamHP);
+                    // Wait for pick-phase to show cards
+                });
+
+                // Pick phase
+                socket.on('pick-phase', ({ timeLimit, hand, cardsLeft }) => {
+                    if (hand) myHand = hand;
+                    selectedCardId = null;
+                    $('btn-confirm-pick').disabled = true;
+                    $('btn-confirm-pick').textContent = 'Confirm Pick';
+                    renderHand();
+                    startTimer(timeLimit);
+                    showScreen('pick-screen');
+                });
+
+                // Pick confirmed
+                socket.on('pick-confirmed', ({ cardId, auto }) => {
+                    if (auto) {
+                        // Card was auto-picked by server
+                    }
+                    $('btn-confirm-pick').disabled = true;
+                    $('btn-confirm-pick').textContent = 'Picked!';
+                    stopTimer();
+                });
+
+                // Resolving phase
+                socket.on('resolving', ({ picks }) => {
+                    const list = $('resolve-list');
+                    list.innerHTML = '';
+                    picks.forEach(p => {
+                        const div = document.createElement('div');
+                        div.className = 'p-resolve-item';
+                        div.innerHTML = `<span class="p-resolve-name">${escapeHtml(p.playerName)}</span> plays <span class="p-resolve-card">"${escapeHtml(p.cardTitle)}"</span>`;
+                        list.appendChild(div);
+                    });
+                    showScreen('resolving-screen');
+                });
+
+                // HP update
+                socket.on('round-result', ({ teamHP: hp, christosHP }) => {
+                    teamHP = hp;
+                    updateHP(teamHP);
+                });
+
+                // No cards left
+                socket.on('no-cards-left', () => {
+                    updateHP(teamHP);
+                    showScreen('nocards-screen');
+                });
+
+                // Game over
+                socket.on('game-over', ({ teamHP: hp, christosHP, rounds }) => {
+                    stopTimer();
+                    $('go-team-hp').textContent = hp;
+                    $('go-christos-hp').textContent = christosHP;
+                    $('go-rounds').textContent = rounds;
+
+                    if (christosHP <= 0) {
+                        $('gameover-title').textContent = 'CV Defeated!';
+                        $('gameover-subtitle').textContent = 'The team found a weakness!';
+                    } else if (hp <= 0) {
+                        $('gameover-title').textContent = 'HP Depleted';
+                        $('gameover-subtitle').textContent = 'Every objection was countered.';
+                    } else {
+                        $('gameover-title').textContent = 'All Objections Played';
+                        $('gameover-subtitle').textContent = 'No objections remain. The CV stands.';
+                    }
+                    showScreen('gameover-screen');
+                });
+
+                // Host disconnected
+                socket.on('host-disconnected', () => {
+                    stopTimer();
+                    $('disconnect-reason').textContent = 'The host has ended the game.';
+                    showScreen('disconnected-screen');
+                });
+
+                socket.on('disconnect', () => {
+                    // Only show if not already on gameover
+                    if (!$('gameover-screen').classList.contains('active')) {
+                        stopTimer();
+                        $('disconnect-reason').textContent = 'Connection lost. Try rejoining.';
+                        showScreen('disconnected-screen');
+                    }
+                });
+            }
+
+            function showError(msg) {
+                $('join-error').textContent = msg;
+                setTimeout(() => { $('join-error').textContent = ''; }, 4000);
+            }
+
+            // ================================
+            // Hand rendering
+            // ================================
+            function renderHand() {
+                const hand = $('player-hand');
+                hand.innerHTML = '';
+
+                myHand.forEach(cardData => {
+                    const card = document.createElement('div');
+                    card.className = 'p-card';
+                    card.dataset.cardId = cardData.id;
+                    card.innerHTML = `
+                        <div class="p-card-header">
+                            <span class="p-card-icon">${cardData.icon}</span>
+                            <span class="p-card-power">${cardData.power}</span>
+                        </div>
+                        <div class="p-card-title">${escapeHtml(cardData.title)}</div>
+                        <div class="p-card-desc">${escapeHtml(cardData.description)}</div>
+                    `;
+
+                    card.addEventListener('click', () => selectCard(cardData.id, card));
+                    hand.appendChild(card);
+                });
+            }
+
+            function selectCard(cardId, cardEl) {
+                // Deselect previous
+                document.querySelectorAll('.p-card.selected').forEach(c => c.classList.remove('selected'));
+
+                selectedCardId = cardId;
+                cardEl.classList.add('selected');
+                $('btn-confirm-pick').disabled = false;
+                $('btn-confirm-pick').textContent = 'Confirm Pick';
+            }
+
+            $('btn-confirm-pick').addEventListener('click', () => {
+                if (!selectedCardId || !socket) return;
+                socket.emit('pick-card', { cardId: selectedCardId });
+                $('btn-confirm-pick').disabled = true;
+                $('btn-confirm-pick').textContent = 'Sending...';
+            });
+
+            // ================================
+            // Timer
+            // ================================
+            function startTimer(seconds) {
+                stopTimer();
+                let remaining = seconds;
+                $('pick-timer').textContent = remaining;
+                $('pick-timer').classList.remove('p-timer-urgent');
+
+                timerInterval = setInterval(() => {
+                    remaining--;
+                    $('pick-timer').textContent = remaining;
+                    if (remaining <= 5) {
+                        $('pick-timer').classList.add('p-timer-urgent');
+                    }
+                    if (remaining <= 0) {
+                        stopTimer();
+                        $('pick-timer').textContent = '0';
+                    }
+                }, 1000);
+            }
+
+            function stopTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }
+
+            // ================================
+            // HP display
+            // ================================
+            function updateHP(hp) {
+                const pct = Math.max(0, (hp / 10) * 100);
+                ['hp-fill', 'hp-fill-resolve', 'hp-fill-nocards'].forEach(id => {
+                    const el = $(id);
+                    if (el) el.style.width = pct + '%';
+                });
+                ['hp-value', 'hp-value-resolve', 'hp-value-nocards'].forEach(id => {
+                    const el = $(id);
+                    if (el) el.textContent = hp;
+                });
+            }
+
+            // ================================
+            // Utility
+            // ================================
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+        })();
+    </script>
+</body>
+
+</html>
