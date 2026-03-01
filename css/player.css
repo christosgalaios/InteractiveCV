@@ -507,3 +507,59 @@ body {
 #pick-screen.active {
   display: flex;
 }
+
+/* ================================
+   Knocked Out screen
+   ================================ */
+.p-ko-icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+
+#knockedout-screen .p-heading {
+  color: var(--crimson-light);
+}
+
+/* ================================
+   Contact links (game over)
+   ================================ */
+.p-contact-links {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.p-contact-header {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.p-contact-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-gold);
+  border-radius: 10px;
+  color: var(--gold);
+  text-decoration: none;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  transition: background 0.2s, border-color 0.2s;
+  word-break: break-all;
+}
+
+.p-contact-btn:active {
+  background: rgba(224, 180, 74, 0.12);
+  border-color: var(--gold);
+}

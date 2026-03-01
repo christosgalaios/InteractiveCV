@@ -35,6 +35,9 @@ const Game = (() => {
     let roomCode = null;
     let multiCardQueue = [];
     let multiPlayers = [];
+    let playerHPs = {};              // { [playerId]: { name, hp, knockedOut } }
+    let currentCardPlayerId = null;  // which player's card is currently resolving
+    let lastRoundDmg = { playerHpLost: 0, christosHpLost: 0 };
 
     // DOM references
     const $ = id => document.getElementById(id);
@@ -207,12 +210,19 @@ const Game = (() => {
         }
         christosHPEl.innerHTML = christosHTML;
 
-        // Recruiter HP (red hearts)
-        let recruiterHTML = '';
-        for (let i = 0; i < HP_CONFIG.recruiter; i++) {
-            recruiterHTML += `<span class="heart recruiter-heart ${i < recruiterHP ? 'heart-full' : 'heart-empty'}">♥</span>`;
+        // Recruiter HP — per-player badges in multi, hearts in solo
+        if (mode === 'multi' && Object.keys(playerHPs).length > 0) {
+            const badges = Object.values(playerHPs).map(p =>
+                `<span class="multi-hp-badge ${p.knockedOut ? 'knocked-out' : ''}" title="${escapeHtml(p.name)}">${p.knockedOut ? '☠' : p.hp}</span>`
+            ).join('');
+            recruiterHPEl.innerHTML = badges;
+        } else {
+            let recruiterHTML = '';
+            for (let i = 0; i < HP_CONFIG.recruiter; i++) {
+                recruiterHTML += `<span class="heart recruiter-heart ${i < recruiterHP ? 'heart-full' : 'heart-empty'}">♥</span>`;
+            }
+            recruiterHPEl.innerHTML = recruiterHTML;
         }
-        recruiterHPEl.innerHTML = recruiterHTML;
     }
 
     // ================================
@@ -545,11 +555,23 @@ const Game = (() => {
         if (counterWins) {
             // Recruiter loses HP based on power difference
             const dmg = Math.max(1, counter.power - objection.power);
-            recruiterHP = Math.max(0, recruiterHP - dmg);
+            if (mode === 'multi') {
+                // Track damage for server; update local display optimistically
+                lastRoundDmg = { playerHpLost: dmg, christosHpLost: 0 };
+                if (currentCardPlayerId && playerHPs[currentCardPlayerId]) {
+                    playerHPs[currentCardPlayerId].hp = Math.max(0, playerHPs[currentCardPlayerId].hp - dmg);
+                }
+                recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+            } else {
+                recruiterHP = Math.max(0, recruiterHP - dmg);
+            }
             resultText.textContent = counter.isGold ? '✦ GOLD COUNTER' : 'COUNTERED';
             resultText.style.color = counter.isGold ? '#ffd700' : '#f5d98a';
         } else {
             christosHP = Math.max(0, christosHP - 1);
+            if (mode === 'multi') {
+                lastRoundDmg = { playerHpLost: 0, christosHpLost: 1 };
+            }
             resultText.textContent = 'RESISTED';
             resultText.style.color = '#f06050';
         }
@@ -603,14 +625,16 @@ const Game = (() => {
                     battleObjCard.classList.add('card-victory-anim');
                 }
 
-                // Check for HP-based game end
-                if (recruiterHP <= 0) {
-                    setTimeout(() => endGame(false, false), 2800);
-                    return;
-                }
-                if (christosHP <= 0) {
-                    setTimeout(() => endGame(false, true), 2800);
-                    return;
+                // Check for HP-based game end (solo only; multi is server-authoritative)
+                if (mode !== 'multi') {
+                    if (recruiterHP <= 0) {
+                        setTimeout(() => endGame(false, false), 2800);
+                        return;
+                    }
+                    if (christosHP <= 0) {
+                        setTimeout(() => endGame(false, true), 2800);
+                        return;
+                    }
                 }
 
                 setTimeout(() => finishRound(), 3200);
@@ -622,15 +646,20 @@ const Game = (() => {
         $('round-display').textContent = `Round ${Math.min(round + 1, totalCards)} / ${totalCards}`;
 
         if (mode === 'multi') {
-            // Tell server this card is resolved
+            // Tell server this card is resolved with per-player damage
             if (socket) {
-                socket.emit('card-resolved', { teamHP: recruiterHP, christosHP });
+                socket.emit('card-resolved', {
+                    playerId: currentCardPlayerId,
+                    playerHpLost: lastRoundDmg.playerHpLost,
+                    christosHpLost: lastRoundDmg.christosHpLost
+                });
             }
+            // Reset damage tracking for next card
+            lastRoundDmg = { playerHpLost: 0, christosHpLost: 0 };
             // Clear battle zone and wait for next card from server
             setTimeout(() => {
                 clearBattleZone();
                 isAnimating = false;
-                // Process queued cards if any arrived while animating
                 processMultiQueue();
             }, 500);
             return;
@@ -868,7 +897,8 @@ const Game = (() => {
         socket.on('game-starting', () => {
             socket.emit('deal-cards', {
                 objectionCards: [...OBJECTION_CARDS],
-                counterCards: [...COUNTER_CARDS]
+                counterCards: [...COUNTER_CARDS],
+                playerHP: HP_CONFIG.recruiter
             });
         });
 
@@ -888,13 +918,13 @@ const Game = (() => {
         });
 
         // Server sends a card to play (one at a time)
-        socket.on('play-card', ({ playerName, cardData }) => {
-            // Add player name to card data for narrator
+        socket.on('play-card', ({ playerName, playerId, cardData }) => {
             cardData._playerName = playerName;
+            cardData._playerId = playerId;
             if (isAnimating) {
-                multiCardQueue.push({ playerName, cardData });
+                multiCardQueue.push({ playerName, playerId, cardData });
             } else {
-                playMultiCard(playerName, cardData);
+                playMultiCard(playerName, playerId, cardData);
             }
         });
 
@@ -907,9 +937,36 @@ const Game = (() => {
             }
         });
 
+        // Per-player HP update from server
+        socket.on('round-result', ({ playerHps, christosHP: cHP }) => {
+            if (playerHps) {
+                Object.entries(playerHps).forEach(([id, data]) => {
+                    playerHPs[id] = data;
+                });
+                recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+            }
+            christosHP = cHP;
+            updateScoreboard();
+            renderHP();
+            updateMultiPlayersBar(
+                Object.values(playerHPs).map(p => ({ ...p, connected: true })),
+                'resolving'
+            );
+        });
+
+        // A player has been knocked out
+        socket.on('player-knocked-out', ({ name }) => {
+            narratorTypewrite(`${escapeHtml(name)} has been knocked out of the battle!`);
+        });
+
         // Game over from server
-        socket.on('game-over', ({ teamHP, christosHP: cHP, rounds }) => {
-            recruiterHP = teamHP;
+        socket.on('game-over', ({ christosHP: cHP, playerHps, rounds }) => {
+            if (playerHps) {
+                Object.entries(playerHps).forEach(([id, data]) => {
+                    playerHPs[id] = data;
+                });
+                recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
+            }
             christosHP = cHP;
             round = rounds;
             if (state !== 'VICTORY') {
@@ -967,9 +1024,19 @@ const Game = (() => {
         state = 'BATTLE';
         round = 0;
         christosHP = HP_CONFIG.christos;
-        recruiterHP = HP_CONFIG.recruiter;
         isAnimating = false;
         multiCardQueue = [];
+        currentCardPlayerId = null;
+        lastRoundDmg = { playerHpLost: 0, christosHpLost: 0 };
+
+        // Initialise per-player HP from multiPlayers (which now includes id & hp from server)
+        playerHPs = {};
+        multiPlayers.forEach(p => {
+            if (p.id) {
+                playerHPs[p.id] = { name: p.name, hp: p.hp || HP_CONFIG.recruiter, knockedOut: p.knockedOut || false };
+            }
+        });
+        recruiterHP = Object.values(playerHPs).reduce((sum, p) => sum + p.hp, 0);
 
         // Set up counter decks locally for the host to animate
         christosDeck = shuffleArray([...COUNTER_CARDS.filter(c => !c.isGold)]);
@@ -1011,9 +1078,9 @@ const Game = (() => {
 
         const label = bar.querySelector('.multi-players-label');
         if (phase === 'picking') {
-            const picked = players.filter(p => p.picked).length;
-            const total = players.filter(p => p.connected).length;
-            label.textContent = `Picks: ${picked} / ${total}`;
+            const active = players.filter(p => p.connected && !p.knockedOut);
+            const picked = active.filter(p => p.picked).length;
+            label.textContent = `Picks: ${picked} / ${active.length}`;
         } else {
             label.textContent = 'Resolving...';
         }
@@ -1024,23 +1091,33 @@ const Game = (() => {
             el.className = 'multi-player-chip';
             if (p.picked) el.classList.add('picked');
             if (!p.connected) el.classList.add('disconnected');
+            if (p.knockedOut) el.classList.add('knocked-out');
+
+            // Get authoritative HP from playerHPs if available
+            const hpEntry = p.id ? playerHPs[p.id] : null;
+            const hp = hpEntry ? hpEntry.hp : (p.hp !== undefined ? p.hp : HP_CONFIG.recruiter);
+            const isKO = hpEntry ? hpEntry.knockedOut : p.knockedOut;
+
             el.innerHTML = `<span class="multi-player-name">${escapeHtml(p.name)}</span>
-                            <span class="multi-player-status">${p.picked ? '✓' : (p.connected ? '...' : '✕')}</span>`;
+                            ${isKO
+                                ? '<span class="multi-player-status">☠</span>'
+                                : `<span class="multi-player-hp">${hp}</span>
+                                   <span class="multi-player-status">${p.picked ? '✓' : (p.connected ? '...' : '✕')}</span>`}`;
             list.appendChild(el);
         });
     }
 
-    function playMultiCard(playerName, cardData) {
+    function playMultiCard(playerName, playerId, cardData) {
+        currentCardPlayerId = playerId;
+        lastRoundDmg = { playerHpLost: 0, christosHpLost: 0 };
         cardData._playerName = playerName;
-        // Play the objection using the existing animation pipeline
-        // Create a temporary card element for animation
         playObjection(cardData, null);
     }
 
     function processMultiQueue() {
         if (multiCardQueue.length > 0 && !isAnimating) {
             const next = multiCardQueue.shift();
-            playMultiCard(next.playerName, next.cardData);
+            playMultiCard(next.playerName, next.playerId, next.cardData);
         }
     }
 
