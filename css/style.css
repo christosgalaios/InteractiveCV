@@ -1911,6 +1911,8 @@ body {
 
   .hp-display {
     max-width: 130px;
+    flex-wrap: nowrap;
+    overflow: hidden;
   }
 }
 
@@ -1957,10 +1959,16 @@ body {
     padding: 6px 8px 2px;
   }
 
+  /* Hand cards are 110px wide — desc at 10px is unreadable noise; battle cards keep it */
   .card-desc {
-    font-size: 10px;
+    display: none;
+  }
+
+  .battle-card .card-desc {
+    display: block;
+    font-size: 11px;
     padding: 2px 8px 4px;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
   }
 
   .card-header {
@@ -1995,11 +2003,6 @@ body {
 
   .battle-card .card-title {
     font-size: 12px;
-  }
-
-  .battle-card .card-desc {
-    font-size: 11px;
-    -webkit-line-clamp: 3;
   }
 
   .modal-content {
@@ -2042,17 +2045,26 @@ body {
     font-size: 11px;
   }
 
+  /* On phones, hearts wrap and break the top bar layout — hide them.
+     The score-value numbers already convey the HP information. */
   .hp-display {
-    max-width: 100px;
+    display: none;
   }
 
   .battle-score {
-    gap: 6px;
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .score-label {
+    white-space: nowrap;
+    font-size: 10px;
+    letter-spacing: 1px;
   }
 
   .score-value {
     font-size: 20px;
-    min-width: 24px;
+    min-width: 20px;
   }
 
   /* Mobile Layout Fix: Stack controls above hand */
