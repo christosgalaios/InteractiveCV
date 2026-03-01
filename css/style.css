@@ -2570,3 +2570,48 @@ body {
   border-color: var(--border-dim);
   font-size: 16px;
 }
+
+/* ============================================
+   WINNER CARD PREVIEW OVERLAY
+   Shown momentarily when a card wins a clash
+   ============================================ */
+#winner-preview-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 200;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.65);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#winner-preview-overlay.active {
+  opacity: 1;
+}
+
+#winner-preview-label {
+  font-family: var(--font-display);
+  font-size: clamp(13px, 2vw, 20px);
+  letter-spacing: 4px;
+  color: var(--gold-light);
+  text-shadow: 0 0 24px rgba(224, 180, 74, 0.9), 0 2px 8px rgba(0, 0, 0, 1);
+  text-transform: uppercase;
+}
+
+/* Override .card-preview fixed positioning when used as winner card */
+#winner-preview-card.card-preview {
+  position: relative;
+  width: 280px;
+  opacity: 1;
+  transform: scale(0.85) translateY(20px);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#winner-preview-overlay.active #winner-preview-card.card-preview {
+  transform: scale(1) translateY(0);
+}
