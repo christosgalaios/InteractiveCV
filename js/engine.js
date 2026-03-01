@@ -621,12 +621,14 @@ const Game = (() => {
                     AudioManager.cardDestroy();
                 }
 
-                // Victory card glows
+                // Victory card glows + full winner preview
                 if (counterWins && battleCtrCard) {
                     battleCtrCard.classList.add('card-victory-anim');
+                    showWinnerPreview(counter, 'counter');
                 }
                 if (!counterWins && battleObjCard) {
                     battleObjCard.classList.add('card-victory-anim');
+                    showWinnerPreview(objection, 'objection');
                 }
 
                 // Check for HP-based game end (solo only; multi is server-authoritative)
@@ -644,6 +646,45 @@ const Game = (() => {
                 setTimeout(() => finishRound(), 3200);
             }, 1500);
         }, 200);
+    }
+
+    function showWinnerPreview(data, type) {
+        const overlay = $('winner-preview-overlay');
+        const labelEl = $('winner-preview-label');
+        const cardEl = $('winner-preview-card');
+        if (!overlay || !cardEl) return;
+
+        const isGold = data.isGold === true;
+        let cardClass = 'card-preview';
+        if (type === 'objection') cardClass += ' objection-card';
+        else { cardClass += ' counter-card'; if (isGold) cardClass += ' gold-card'; }
+        cardEl.className = cardClass;
+
+        const typeBadge = type === 'objection' ? 'Objection' : (isGold ? '✦ Reference Letter' : 'Counter');
+        const sourceText = type === 'objection' ? (data.category || '') : (data.source || '');
+
+        cardEl.innerHTML = `
+            <div class="preview-inner">
+                <div class="card-header">
+                    <div class="card-icon-badge">${data.icon}</div>
+                    <div class="card-power">${data.power}</div>
+                </div>
+                <div class="card-art">${data.icon}</div>
+                <div class="card-title">${escapeHtml(data.title)}</div>
+                <div class="card-desc">${escapeHtml(data.description)}</div>
+                <div class="card-footer">
+                    <span class="card-type-badge">${typeBadge}</span>
+                    <span class="card-source">${escapeHtml(sourceText)}</span>
+                </div>
+            </div>
+        `;
+
+        if (labelEl) {
+            labelEl.textContent = type === 'objection' ? 'Resisted!' : (isGold ? '✦ Gold Counter!' : 'Countered!');
+        }
+
+        overlay.classList.add('active');
+        setTimeout(() => overlay.classList.remove('active'), 2000);
     }
 
     function finishRound() {
