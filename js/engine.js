@@ -605,15 +605,15 @@ const Game = (() => {
 
                 // Check for HP-based game end
                 if (recruiterHP <= 0) {
-                    setTimeout(() => endGame(false, false), 1200);
+                    setTimeout(() => endGame(false, false), 2800);
                     return;
                 }
                 if (christosHP <= 0) {
-                    setTimeout(() => endGame(false, true), 1200);
+                    setTimeout(() => endGame(false, true), 2800);
                     return;
                 }
 
-                setTimeout(() => finishRound(), 1800);
+                setTimeout(() => finishRound(), 3200);
             }, 1500);
         }, 200);
     }
