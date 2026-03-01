@@ -229,6 +229,55 @@ const OBJECTION_CARDS = [
     power: 3,
     category: "soft-skills",
     icon: "🗣️"
+  },
+  // --- Piing-specific objections ---
+  {
+    id: "obj_unity_native",
+    title: "Where's Your Unity C#?",
+    description: "We build in Unity C#. Your VR work was TypeScript/Horizon — that's not Unity.",
+    power: 3,
+    category: "technical",
+    icon: "🎮"
+  },
+  {
+    id: "obj_rapid_prototype",
+    title: "Too Slow to Prototype",
+    description: "We need playable game prototypes in days, not months. Can you move that fast?",
+    power: 3,
+    category: "process",
+    icon: "⏱️"
+  },
+  {
+    id: "obj_live_events",
+    title: "Never Built Live Event Games",
+    description: "50,000 fans in a stadium, live. Can you design interaction at that scale?",
+    power: 3,
+    category: "architecture",
+    icon: "🏟️"
+  },
+  {
+    id: "obj_multidiscipline",
+    title: "Jack of All, Master of None",
+    description: "This role spans code, design, and animation. Engineers rarely excel at all three.",
+    power: 2,
+    category: "design",
+    icon: "🎨"
+  },
+  {
+    id: "obj_js_player_input",
+    title: "No JS/TS Player Interface",
+    description: "Players join on their phones via a browser. TypeScript UI is non-negotiable.",
+    power: 2,
+    category: "technical",
+    icon: "📱"
+  },
+  {
+    id: "obj_game_toolkit",
+    title: "Never Built a Game Toolkit",
+    description: "Our custom game-making toolkit is our core product. Relevant experience?",
+    power: 3,
+    category: "tools",
+    icon: "🛠️"
   }
 ];
 
@@ -515,6 +564,73 @@ const COUNTER_CARDS = [
     category: "leadership",
     icon: "💫",
     isGold: true
+  },
+  // --- Piing-specific counters (verified experience only) ---
+  {
+    id: "ctr_unity_native",
+    counters: "obj_unity_native",
+    title: "2 Years Unity C# — Shipped",
+    description: "Virtually Sports (2021–2023): Unity + C#, shipped 2 commercial titles end-to-end. State machines, crowd AI, spatial audio — all C#. This is my native stack.",
+    power: 6,
+    source: "Virtually Sports",
+    category: "technical",
+    icon: "🎮",
+    isGold: false
+  },
+  {
+    id: "ctr_rapid_prototype",
+    counters: "obj_rapid_prototype",
+    title: "Prototype Greenlit a Full Title",
+    description: "'Blind Pickup' haptic UX prototype was so compelling the client greenlit the full game. Fast, evidence-backed iteration is my track record at Koffee Cup.",
+    power: 6,
+    source: "Interactive Dev @ Koffee Cup",
+    category: "process",
+    icon: "⚡",
+    isGold: false
+  },
+  {
+    id: "ctr_live_events",
+    counters: "obj_live_events",
+    title: "Stadium Crowd AI — 10,000+ Entities",
+    description: "Virtually Sports: probabilistic crowd reaction AI for 10,000+ stadium entities, real-time, for a live-event broadcast company. Server-side with 99.9% uptime.",
+    power: 7,
+    source: "Virtually Sports",
+    category: "architecture",
+    icon: "🏟️",
+    isGold: false
+  },
+  {
+    id: "ctr_multidiscipline",
+    counters: "obj_multidiscipline",
+    title: "Lead Across All Disciplines",
+    description: "As Technical Lead: shipped programming, baked animation pipelines, and spatial audio in the same sprints. Worked directly with Creative Directors on game feel and design.",
+    power: 5,
+    source: "Tech Lead @ Koffee Cup",
+    category: "design",
+    icon: "🎨",
+    isGold: false
+  },
+  {
+    id: "ctr_js_player_input",
+    counters: "obj_js_player_input",
+    title: "TypeScript Multiplayer UI, Shipped",
+    description: "Mastered TypeScript + Meta Horizon's proprietary engine from zero. Built interactive multiplayer input UI for real players. Optimistic networking for zero-latency feedback. Promoted in 12 months.",
+    power: 5,
+    source: "Interactive Dev @ Koffee Cup",
+    category: "technical",
+    icon: "📱",
+    isGold: false
+  },
+  {
+    id: "ctr_game_toolkit",
+    counters: "obj_game_toolkit",
+    title: "Non-Engineer-Ready Dev Tools",
+    description: "Material Testing Tool (real-time asset validation for artists) + Debug/Cheat System (state injection, level population) enabling designers to test without writing code. 10x velocity.",
+    power: 6,
+    source: "Tech Lead @ Koffee Cup",
+    category: "tools",
+    icon: "🛠️",
+    isGold: false
   }
 ];
 

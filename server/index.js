@@ -75,6 +75,15 @@ function shuffleArray(arr) {
   return a;
 }
 
+// Build playerHps map for broadcast
+function buildPlayerHps(room) {
+  const playerHps = {};
+  room.players.forEach(p => {
+    playerHps[p.id] = { hp: p.hp, name: p.name, knockedOut: p.knockedOut };
+  });
+  return playerHps;
+}
+
 // ============================================
 // Socket.io event handling
 // ============================================
@@ -90,7 +99,7 @@ io.on('connection', (socket) => {
       christosDeck: [],
       goldDeck: [],
       christosHP: 1,
-      teamHP: 10,
+      playerStartHP: 10,
       round: 0,
       phase: 'LOBBY',
       currentPicks: {},
@@ -126,6 +135,8 @@ io.on('connection', (socket) => {
       id: socket.id,
       name: name || `Player ${room.players.length + 1}`,
       hand: [],
+      hp: 0,          // set when game starts
+      knockedOut: false,
       connected: true
     };
     room.players.push(player);
@@ -135,13 +146,14 @@ io.on('connection', (socket) => {
     socket.isHost = false;
     socket.playerName = player.name;
 
-    socket.emit('joined', { playerIndex: room.players.length - 1, name: player.name });
+    // Include playerId so the phone knows its own server ID
+    socket.emit('joined', { playerIndex: room.players.length - 1, name: player.name, playerId: socket.id });
 
     // Notify host
     io.to(room.host).emit('player-joined', {
       name: player.name,
       playerCount: room.players.length,
-      players: room.players.map(p => ({ name: p.name, connected: p.connected }))
+      players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected }))
     });
 
     console.log(`${player.name} joined room ${upperCode} (${room.players.length} players)`);
@@ -153,46 +165,48 @@ io.on('connection', (socket) => {
     if (!room || room.host !== socket.id) return;
     if (room.players.length === 0) return;
 
-    // Deal cards to players — we need the card data from the client
-    // The host sends card data with start-game
     room.phase = 'DEALING';
     io.to(socket.roomCode).emit('game-starting');
   });
 
   // Host sends card data for dealing
-  socket.on('deal-cards', ({ objectionCards, counterCards }) => {
+  socket.on('deal-cards', ({ objectionCards, counterCards, playerHP }) => {
     const room = rooms[socket.roomCode];
     if (!room || room.host !== socket.id) return;
+
+    const startHP = playerHP || room.playerStartHP;
+    room.playerStartHP = startHP;
 
     // Shuffle objection cards and deal evenly
     const shuffled = shuffleArray(objectionCards);
     const playerCount = room.players.length;
     room.totalCards = shuffled.length;
 
-    // Split cards among players
-    room.players.forEach((p, i) => {
+    // Initialise each player's hand and HP
+    room.players.forEach(p => {
       p.hand = [];
+      p.hp = startHP;
+      p.knockedOut = false;
     });
 
     shuffled.forEach((card, i) => {
-      const playerIdx = i % playerCount;
-      room.players[playerIdx].hand.push(card);
+      room.players[i % playerCount].hand.push(card);
     });
 
     // Store counter decks on server
     room.christosDeck = counterCards.filter(c => !c.isGold);
     room.goldDeck = counterCards.filter(c => c.isGold);
     room.christosHP = 1;
-    room.teamHP = 10;
     room.round = 0;
     room.phase = 'PICKING';
 
-    // Send each player their hand
+    // Send each player their hand + own HP + own ID
     room.players.forEach(p => {
       io.to(p.id).emit('game-started', {
         hand: p.hand,
         totalPlayers: playerCount,
-        teamHP: room.teamHP
+        myHP: startHP,
+        myPlayerId: p.id
       });
     });
 
@@ -200,11 +214,14 @@ io.on('connection', (socket) => {
     io.to(room.host).emit('round-start', {
       roundNumber: 1,
       playerCount: room.players.filter(p => p.connected).length,
-      players: room.players.map(p => ({ name: p.name, connected: p.connected, cardsLeft: p.hand.length }))
+      players: room.players.map(p => ({
+        id: p.id, name: p.name, connected: p.connected,
+        cardsLeft: p.hand.length, hp: p.hp, knockedOut: p.knockedOut
+      }))
     });
 
     startPickingPhase(socket.roomCode);
-    console.log(`Game started in room ${socket.roomCode} with ${playerCount} players`);
+    console.log(`Game started in room ${socket.roomCode} with ${playerCount} players, ${startHP} HP each`);
   });
 
   // --- PLAYER: Pick a card ---
@@ -213,14 +230,14 @@ io.on('connection', (socket) => {
     if (!room || room.phase !== 'PICKING') return;
 
     const player = room.players.find(p => p.id === socket.id);
-    if (!player) return;
+    if (!player || player.knockedOut) return;
 
     // Validate the card is in player's hand
     const cardIdx = player.hand.findIndex(c => c.id === cardId);
     if (cardIdx === -1) return;
 
     const cardData = player.hand[cardIdx];
-    room.currentPicks[socket.id] = { playerName: player.name, cardData };
+    room.currentPicks[socket.id] = { playerName: player.name, playerId: socket.id, cardData };
 
     // Remove from hand
     player.hand.splice(cardIdx, 1);
@@ -231,35 +248,55 @@ io.on('connection', (socket) => {
     io.to(room.host).emit('player-picked', {
       playerName: player.name,
       pickedCount: Object.keys(room.currentPicks).length,
-      totalPlayers: room.players.filter(p => p.connected && p.hand.length >= 0).length,
+      totalPlayers: room.players.filter(p => p.connected && !p.knockedOut).length,
       players: room.players.map(p => ({
-        name: p.name,
+        id: p.id, name: p.name,
         picked: !!room.currentPicks[p.id],
-        connected: p.connected
+        connected: p.connected, hp: p.hp, knockedOut: p.knockedOut
       }))
     });
 
-    // Check if all connected players with cards have picked
+    // Check if all connected, non-KO players with cards have picked
     checkAllPicked(socket.roomCode);
   });
 
   // --- HOST: Finished animating one card ---
-  socket.on('card-resolved', ({ teamHP, christosHP }) => {
+  socket.on('card-resolved', ({ playerId, playerHpLost, christosHpLost }) => {
     const room = rooms[socket.roomCode];
     if (!room) return;
 
-    room.teamHP = teamHP;
-    room.christosHP = christosHP;
+    // Apply Christos HP damage
+    room.christosHP = Math.max(0, room.christosHP - (christosHpLost || 0));
+
+    // Apply damage to the specific player who played the card
+    if (playerId && playerHpLost > 0) {
+      const player = room.players.find(p => p.id === playerId);
+      if (player && !player.knockedOut) {
+        player.hp = Math.max(0, player.hp - playerHpLost);
+        if (player.hp <= 0) {
+          player.knockedOut = true;
+          io.to(player.id).emit('knocked-out', { name: player.name });
+          io.to(room.host).emit('player-knocked-out', { name: player.name });
+          console.log(`${player.name} knocked out in room ${socket.roomCode}`);
+        }
+      }
+    }
+
     room.resolvedCount++;
 
-    // Notify players of HP update
+    // Build updated HP map and notify everyone
+    const playerHps = buildPlayerHps(room);
     room.players.forEach(p => {
-      io.to(p.id).emit('round-result', { teamHP, christosHP });
+      if (p.connected) {
+        io.to(p.id).emit('round-result', { playerHps, christosHP: room.christosHP });
+      }
     });
 
-    // Check if game is over
-    if (teamHP <= 0 || christosHP <= 0) {
-      endGame(socket.roomCode, teamHP, christosHP);
+    // Check game-over conditions
+    const connectedPlayers = room.players.filter(p => p.connected);
+    const allKnockedOut = connectedPlayers.length > 0 && connectedPlayers.every(p => p.knockedOut);
+    if (allKnockedOut || room.christosHP <= 0) {
+      endGame(socket.roomCode, room.christosHP);
       return;
     }
 
@@ -271,10 +308,10 @@ io.on('connection', (socket) => {
       // All cards resolved for this round
       io.to(room.host).emit('all-resolved');
 
-      // Check if any players still have cards
-      const anyCardsLeft = room.players.some(p => p.connected && p.hand.length > 0);
+      // Check if any active players still have cards
+      const anyCardsLeft = room.players.some(p => p.connected && !p.knockedOut && p.hand.length > 0);
       if (!anyCardsLeft) {
-        endGame(socket.roomCode, room.teamHP, room.christosHP);
+        endGame(socket.roomCode, room.christosHP);
         return;
       }
 
@@ -286,8 +323,11 @@ io.on('connection', (socket) => {
 
       io.to(room.host).emit('round-start', {
         roundNumber: room.round + 1,
-        playerCount: room.players.filter(p => p.connected).length,
-        players: room.players.map(p => ({ name: p.name, connected: p.connected, cardsLeft: p.hand.length }))
+        playerCount: room.players.filter(p => p.connected && !p.knockedOut).length,
+        players: room.players.map(p => ({
+          id: p.id, name: p.name, connected: p.connected,
+          cardsLeft: p.hand.length, hp: p.hp, knockedOut: p.knockedOut
+        }))
       });
 
       startPickingPhase(socket.roomCode);
@@ -321,12 +361,13 @@ io.on('connection', (socket) => {
       io.to(room.host).emit('player-left', {
         name: player.name,
         playerCount: room.players.filter(p => p.connected).length,
-        players: room.players.map(p => ({ name: p.name, connected: p.connected }))
+        players: room.players.map(p => ({
+          id: p.id, name: p.name, connected: p.connected, hp: p.hp, knockedOut: p.knockedOut
+        }))
       });
 
       // If in picking phase, check if remaining players have all picked
       if (room.phase === 'PICKING') {
-        // Remove disconnected player's pending pick
         delete room.currentPicks[socket.id];
         checkAllPicked(code);
       }
@@ -345,18 +386,26 @@ function startPickingPhase(code) {
   room.cardQueue = [];
   room.resolvedCount = 0;
 
-  // Tell players to pick
+  // Tell eligible players to pick (skip knocked-out)
+  let anyCanPick = false;
   room.players.forEach(p => {
-    if (p.connected && p.hand.length > 0) {
+    if (!p.connected || p.knockedOut) return;
+    if (p.hand.length > 0) {
+      anyCanPick = true;
       io.to(p.id).emit('pick-phase', {
         timeLimit: 15,
         hand: p.hand,
         cardsLeft: p.hand.length
       });
-    } else if (p.connected && p.hand.length === 0) {
+    } else {
       io.to(p.id).emit('no-cards-left');
     }
   });
+
+  if (!anyCanPick) {
+    endGame(code, room.christosHP);
+    return;
+  }
 
   // Start countdown timer
   if (room.pickTimer) clearTimeout(room.pickTimer);
@@ -371,10 +420,8 @@ function checkAllPicked(code) {
   const room = rooms[code];
   if (!room || room.phase !== 'PICKING') return;
 
-  const connectedWithCards = room.players.filter(p => p.connected && p.hand.length >= 0);
-  // Players who can pick: connected players who had cards at start of round
-  // (cards are removed from hand on pick, so check currentPicks)
-  const eligiblePlayers = room.players.filter(p => p.connected);
+  // Only count connected, non-knocked-out players
+  const eligiblePlayers = room.players.filter(p => p.connected && !p.knockedOut);
   const allPicked = eligiblePlayers.every(p =>
     room.currentPicks[p.id] || p.hand.length === 0
   );
@@ -389,13 +436,12 @@ function forceResolvePicks(code) {
   const room = rooms[code];
   if (!room || room.phase !== 'PICKING') return;
 
-  // Auto-pick for players who haven't picked yet
+  // Auto-pick for eligible players who haven't picked yet
   room.players.forEach(p => {
-    if (p.connected && !room.currentPicks[p.id] && p.hand.length > 0) {
-      // Pick a random card
+    if (p.connected && !p.knockedOut && !room.currentPicks[p.id] && p.hand.length > 0) {
       const randomIdx = Math.floor(Math.random() * p.hand.length);
       const card = p.hand[randomIdx];
-      room.currentPicks[p.id] = { playerName: p.name, cardData: card };
+      room.currentPicks[p.id] = { playerName: p.name, playerId: p.id, cardData: card };
       p.hand.splice(randomIdx, 1);
       io.to(p.id).emit('pick-confirmed', { cardId: card.id, auto: true });
     }
@@ -404,8 +450,7 @@ function forceResolvePicks(code) {
   if (Object.keys(room.currentPicks).length > 0) {
     startResolvingPhase(code);
   } else {
-    // No picks at all — end game
-    endGame(code, room.teamHP, room.christosHP);
+    endGame(code, room.christosHP);
   }
 }
 
@@ -414,9 +459,9 @@ function startResolvingPhase(code) {
   if (!room) return;
   room.phase = 'RESOLVING';
 
-  // Build the queue of cards to resolve
+  // Build the queue of cards to resolve (each pick includes playerId)
   const picks = Object.values(room.currentPicks);
-  room.cardQueue = picks.slice(1); // First card sent immediately, rest queued
+  room.cardQueue = picks.slice(1);
 
   // Notify players about resolving
   const pickSummary = picks.map(p => ({ playerName: p.playerName, cardTitle: p.cardData.title }));
@@ -426,18 +471,19 @@ function startResolvingPhase(code) {
     }
   });
 
-  // Send first card to host
+  // Send first card to host (includes playerId for damage routing)
   if (picks.length > 0) {
     io.to(room.host).emit('play-card', picks[0]);
   }
 }
 
-function endGame(code, teamHP, christosHP) {
+function endGame(code, christosHP) {
   const room = rooms[code];
   if (!room) return;
   room.phase = 'VICTORY';
 
-  const result = { teamHP, christosHP, rounds: room.round + 1 };
+  const playerHps = buildPlayerHps(room);
+  const result = { christosHP, playerHps, rounds: room.round + 1 };
 
   io.to(room.host).emit('game-over', result);
   room.players.forEach(p => {
