@@ -569,9 +569,9 @@ const COUNTER_CARDS = [
   {
     id: "ctr_unity_native",
     counters: "obj_unity_native",
-    title: "2 Years Unity C# — Shipped",
-    description: "Virtually Sports (2021–2023): Unity + C#, shipped 2 commercial titles end-to-end. State machines, crowd AI, spatial audio — all C#. This is my native stack.",
-    power: 6,
+    title: "5+ Years Unity C# — Deep Roots",
+    description: "Studied games programming (Unity & C#) at uni, then 2 commercial years at Virtually Sports shipping titles end-to-end, followed by 3 years on a Unity-like engine. State machines, crowd AI, spatial audio — this is my native stack.",
+    power: 7,
     source: "Virtually Sports",
     category: "technical",
     icon: "🎮",
